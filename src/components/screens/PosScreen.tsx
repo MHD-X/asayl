@@ -1,0 +1,854 @@
+import { useState, useMemo } from 'react';
+import { useSettings } from '@/context/SettingsContext';
+import type { CartItem, OrderType, PaymentMethod, Order, ActiveOrder, CustomerInfo } from '@/types';
+import { ORDER_TYPE_LABELS } from '@/types';
+import { uid, formatMoney, getProductPrice, addAuditEntry } from '@/utils/storage';
+import { browserPrint } from '@/utils/printer';
+import {
+  Printer, ChefHat, XCircle, Percent, StickyNote, Tag, MoreHorizontal,
+  Search, Plus, Minus, Trash2, ShoppingCart, CreditCard,
+  Bike, Store, Utensils, ShoppingBag, FilePlus, Layers,
+  AlertCircle, CheckCircle2, User,
+} from 'lucide-react';
+import { Modal, Button, Input, TextArea, Select } from '@/components/ui/Modal';
+import { PinPad } from '@/components/PinPad';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { CheckoutModal } from '@/components/CheckoutModal';
+import { Receipt } from '@/components/Receipt';
+import { KitchenTicket } from '@/components/KitchenTicket';
+
+export function PosScreen() {
+  const { settings, update } = useSettings();
+  const [activeCategoryId, setActiveCategoryId] = useState<string>(
+    settings.categories[0]?.id ?? ''
+  );
+  const [currentOrderId, setCurrentOrderId] = useState<string>('');
+  const [search, setSearch] = useState('');
+  const [noteModalOpen, setNoteModalOpen] = useState(false);
+  const [noteItemIndex, setNoteItemIndex] = useState<number>(-1);
+  const [noteText, setNoteText] = useState('');
+  const [discountModalOpen, setDiscountModalOpen] = useState(false);
+  const [discountValue, setDiscountValue] = useState('');
+  const [pinPadOpen, setPinPadOpen] = useState(false);
+  const [pinAction, setPinAction] = useState<'void' | 'refund' | null>(null);
+  const [confirmVoidOpen, setConfirmVoidOpen] = useState(false);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [lastOrder, setLastOrder] = useState<Order | null>(null);
+  const [receiptOpen, setReceiptOpen] = useState(false);
+  const [tagsModalOpen, setTagsModalOpen] = useState(false);
+  const [moreModalOpen, setMoreModalOpen] = useState(false);
+  const [ordersListOpen, setOrdersListOpen] = useState(false);
+  const [printError, setPrintError] = useState('');
+  const [printSuccess, setPrintSuccess] = useState(false);
+  const [kitchenError, setKitchenError] = useState('');
+  const [refundOrder, setRefundOrder] = useState<Order | null>(null);
+  const [refundModalOpen, setRefundModalOpen] = useState(false);
+  const [refundAmount, setRefundAmount] = useState('');
+  const [refundReason, setRefundReason] = useState('');
+  const [kitchenPreviewOrder, setKitchenPreviewOrder] = useState<Order | null>(null);
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerAddress, setCustomerAddress] = useState('');
+
+  const currentOrder = useMemo(
+    () => settings.activeOrders.find((o) => o.id === currentOrderId) ?? null,
+    [settings.activeOrders, currentOrderId]
+  );
+
+  const cart = currentOrder?.items ?? [];
+  const orderType = currentOrder?.type ?? 'dine-in';
+  const tableLabel = currentOrder?.tableLabel ?? '';
+  const deliveryZoneId = currentOrder?.deliveryZoneId ?? '';
+  const orderDiscount = currentOrder?.discount ?? 0;
+  const orderTagIds = currentOrder?.tagIds ?? [];
+
+  const products = useMemo(
+    () => settings.products.filter((p) => p.available),
+    [settings.products]
+  );
+
+  const filteredProducts = useMemo(() => {
+    let list = products;
+    if (activeCategoryId) list = list.filter((p) => p.categoryId === activeCategoryId);
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      list = list.filter((p) => p.name.toLowerCase().includes(q));
+    }
+    return list;
+  }, [products, activeCategoryId, search]);
+
+  const deliveryFee = useMemo(() => {
+    if (orderType !== 'delivery' || !deliveryZoneId) return 0;
+    return settings.deliveryZones.find((z) => z.id === deliveryZoneId)?.fee ?? 0;
+  }, [orderType, deliveryZoneId, settings.deliveryZones]);
+
+  const subtotal = useMemo(
+    () => cart.reduce((s, i) => s + i.price * i.qty, 0),
+    [cart]
+  );
+  const total = Math.max(0, subtotal - orderDiscount + deliveryFee);
+
+  const estimatedVat = useMemo(
+    () => Math.round((subtotal - orderDiscount) * settings.financials.vatValue) / 100,
+    [subtotal, orderDiscount, settings.financials.vatValue]
+  );
+
+  const showCustomerForm = orderType === 'delivery' || orderType === 'talabat';
+
+  const currentCustomer: CustomerInfo | undefined = (customerName || customerPhone || customerAddress)
+    ? { name: customerName || undefined, phone: customerPhone || undefined, address: customerAddress || undefined }
+    : undefined;
+
+  const updateCurrentOrder = (patch: Partial<ActiveOrder>) => {
+    if (!currentOrderId) return;
+    update((prev) => ({
+      ...prev,
+      activeOrders: prev.activeOrders.map((o) =>
+        o.id === currentOrderId ? { ...o, ...patch } : o
+      ),
+    }));
+  };
+
+  const updateCart = (updater: (prev: CartItem[]) => CartItem[]) => {
+    if (!currentOrderId) return;
+    update((prev) => ({
+      ...prev,
+      activeOrders: prev.activeOrders.map((o) =>
+        o.id === currentOrderId ? { ...o, items: updater(o.items) } : o
+      ),
+    }));
+  };
+
+  const newOrder = (type: OrderType = 'dine-in') => {
+    const order: ActiveOrder = {
+      id: uid('active'),
+      type,
+      items: [],
+      discount: 0,
+      tagIds: [],
+      status: 'open',
+      createdAt: new Date().toISOString(),
+    };
+    update((prev) => ({ ...prev, activeOrders: [...prev.activeOrders, order] }));
+    setCurrentOrderId(order.id);
+    setActiveCategoryId(settings.categories[0]?.id ?? '');
+  };
+
+  const switchOrder = (id: string) => {
+    setCurrentOrderId(id);
+    setOrdersListOpen(false);
+  };
+
+  const deleteActiveOrder = (id: string) => {
+    update((prev) => ({
+      ...prev,
+      activeOrders: prev.activeOrders.filter((o) => o.id !== id),
+    }));
+    if (currentOrderId === id) {
+      const remaining = settings.activeOrders.filter((o) => o.id !== id);
+      setCurrentOrderId(remaining[0]?.id ?? '');
+    }
+  };
+
+  const setOrderType = (type: OrderType) => {
+    if (!currentOrderId) {
+      newOrder(type);
+      return;
+    }
+    updateCurrentOrder({ type });
+  };
+
+  const addToCart = (productId: string) => {
+    const product = settings.products.find((p) => p.id === productId);
+    if (!product) return;
+    const price = getProductPrice(product.prices, orderType);
+    updateCart((prev) => {
+      const existing = prev.findIndex((i) => i.productId === productId && !i.note && !i.modifiers);
+      if (existing >= 0) {
+        const next = [...prev];
+        next[existing] = { ...next[existing], qty: next[existing].qty + 1 };
+        return next;
+      }
+      return [...prev, { productId: product.id, name: product.name, price, qty: 1 }];
+    });
+  };
+
+  const changeQty = (index: number, delta: number) => {
+    updateCart((prev) => {
+      const next = [...prev];
+      const item = next[index];
+      const newQty = item.qty + delta;
+      if (newQty <= 0) {
+        next.splice(index, 1);
+      } else {
+        next[index] = { ...item, qty: newQty };
+      }
+      return next;
+    });
+  };
+
+  const removeItem = (index: number) => {
+    updateCart((prev) => {
+      const next = [...prev];
+      next.splice(index, 1);
+      return next;
+    });
+  };
+
+  const openNoteForItem = (index: number) => {
+    setNoteItemIndex(index);
+    setNoteText(cart[index]?.note ?? '');
+    setNoteModalOpen(true);
+  };
+
+  const saveNote = () => {
+    updateCart((prev) => {
+      const next = [...prev];
+      if (next[noteItemIndex]) {
+        next[noteItemIndex] = { ...next[noteItemIndex], note: noteText || undefined };
+      }
+      return next;
+    });
+    setNoteModalOpen(false);
+  };
+
+  const applyDiscount = () => {
+    const val = parseFloat(discountValue) || 0;
+    updateCurrentOrder({ discount: Math.min(val, subtotal) });
+    setDiscountModalOpen(false);
+    setDiscountValue('');
+  };
+
+  const voidOrder = () => {
+    setPinAction('void');
+    setPinPadOpen(true);
+  };
+
+  const onPinSuccess = () => {
+    setPinPadOpen(false);
+    if (pinAction === 'void') {
+      if (currentOrderId) deleteActiveOrder(currentOrderId);
+      let newSettings = addAuditEntry(settings, settings.cashierName || 'كاشير', 'manager', 'إلغاء طلب');
+      update(() => newSettings);
+      setConfirmVoidOpen(false);
+    }
+    if (pinAction === 'refund' && refundOrder) {
+      setRefundModalOpen(true);
+    }
+    setPinAction(null);
+  };
+
+  const completeOrder = (paymentMethod: PaymentMethod, serviceCharge: number, tax: number, closerName: string) => {
+    if (cart.length === 0) return;
+    const shiftOrders = settings.shifts.find((s) => s.id === settings.currentShiftId)?.orders ?? [];
+    const orderNumber = shiftOrders.length + 1;
+    const finalTotal = Math.max(0, subtotal - orderDiscount + deliveryFee + serviceCharge + tax);
+    const order: Order = {
+      id: uid('order'),
+      number: orderNumber,
+      type: orderType,
+      tableLabel: orderType === 'dine-in' ? tableLabel : undefined,
+      deliveryZoneId: orderType === 'delivery' ? deliveryZoneId : undefined,
+      deliveryFee,
+      items: [...cart],
+      subtotal,
+      serviceCharge,
+      tax,
+      discount: orderDiscount,
+      total: finalTotal,
+      paymentMethod,
+      cashierName: settings.cashierName || 'كاشير',
+      closerName: closerName || undefined,
+      customer: currentCustomer,
+      createdAt: new Date().toISOString(),
+      tagIds: orderTagIds,
+      status: 'completed',
+    };
+    update((prev) => {
+      const orders = [...prev.orders, order];
+      const shifts = prev.shifts.map((s) =>
+        s.id === prev.currentShiftId
+          ? { ...s, orders: [...s.orders, order.id] }
+          : s
+      );
+      return {
+        ...prev,
+        orders,
+        shifts,
+        activeOrders: prev.activeOrders.filter((o) => o.id !== currentOrderId),
+      };
+    });
+    setLastOrder(order);
+    setCheckoutOpen(false);
+    setReceiptOpen(true);
+    setCustomerName('');
+    setCustomerPhone('');
+    setCustomerAddress('');
+    const remaining = settings.activeOrders.filter((o) => o.id !== currentOrderId);
+    setCurrentOrderId(remaining[0]?.id ?? '');
+  };
+
+  const handlePrintReceipt = () => {
+    if (!lastOrder) return;
+    setPrintError('');
+    try {
+      window.print();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setPrintError(`فشل الطباعة: ${msg}`);
+    }
+  };
+
+  const handlePrintKitchen = () => {
+    setKitchenError('');
+    const orderToPrint = lastOrder ?? (cart.length > 0 ? {
+      id: 'temp', number: 0, type: orderType, tableLabel, deliveryZoneId, deliveryFee,
+      items: cart, subtotal, serviceCharge: 0, tax: 0, discount: orderDiscount, total,
+      paymentMethod: 'cash' as PaymentMethod, cashierName: settings.cashierName || 'كاشير',
+      customer: currentCustomer,
+      createdAt: new Date().toISOString(), tagIds: orderTagIds, status: 'open' as const,
+    } : null);
+    if (!orderToPrint) return;
+    setKitchenPreviewOrder(orderToPrint);
+  };
+
+  const handleKitchenPrintConfirm = () => {
+    const result = browserPrint();
+    if (!result.success) {
+      setKitchenError(result.error ?? 'فشل طباعة المطبخ');
+    } else {
+      if (currentOrderId) updateCurrentOrder({ status: 'sent' });
+      setPrintSuccess(true);
+      setTimeout(() => setPrintSuccess(false), 3000);
+    }
+    setKitchenPreviewOrder(null);
+  };
+
+  const processRefund = () => {
+    if (!refundOrder || !refundAmount) return;
+    const amount = parseFloat(refundAmount) || 0;
+    update((prev) => {
+      let s = {
+        ...prev,
+        orders: prev.orders.map((o) =>
+          o.id === refundOrder.id
+            ? { ...o, refunded: true, refundAmount: amount, refundReason }
+            : o
+        ),
+      };
+      s = addAuditEntry(s, settings.cashierName || 'كاشير', 'manager', 'استرداد', {
+        orderId: refundOrder.id, amount, reason: refundReason,
+      });
+      return s;
+    });
+    setRefundOrder(null);
+    setRefundModalOpen(false);
+    setRefundAmount('');
+    setRefundReason('');
+  };
+
+  return (
+    <div className="flex h-full" dir="rtl">
+      <div className="flex-1 flex flex-col bg-gray-50">
+        {/* Top utility bar */}
+        <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <div className="relative flex-1 max-w-xs">
+              <Search size={18} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Input
+                placeholder="بحث عن منتج..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pr-10"
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <TopButton icon={FilePlus} label="طلب جديد" variant="primary" onClick={() => newOrder()} />
+            <TopButton
+              icon={Layers}
+              label={`الطلبات النشطة (${settings.activeOrders.length})`}
+              onClick={() => setOrdersListOpen(true)}
+            />
+            <TopButton icon={Printer} label="طباعة" onClick={() => lastOrder && setReceiptOpen(true)} />
+            <TopButton icon={ChefHat} label="مطبخ" onClick={handlePrintKitchen} />
+            <TopButton icon={XCircle} label="إلغاء" variant="danger" onClick={() => cart.length > 0 ? setConfirmVoidOpen(true) : voidOrder()} disabled={!currentOrderId} />
+            <TopButton icon={Percent} label="خصم" onClick={() => { setDiscountValue(String(orderDiscount || '')); setDiscountModalOpen(true); }} disabled={!currentOrderId} />
+            <TopButton icon={StickyNote} label="ملاحظات" onClick={() => { if (cart.length > 0) { setNoteItemIndex(cart.length - 1); setNoteText(''); setNoteModalOpen(true); } }} disabled={!currentOrderId} />
+            <TopButton icon={Tag} label="وسوم" onClick={() => setTagsModalOpen(true)} disabled={!currentOrderId} />
+            <TopButton icon={MoreHorizontal} label="المزيد" onClick={() => setMoreModalOpen(true)} />
+          </div>
+        </div>
+
+        {/* Print status banners */}
+        {printError && (
+          <div className="bg-red-50 border-b border-red-200 px-4 py-2 flex items-center gap-2 text-sm text-red-700">
+            <AlertCircle size={16} />
+            {printError}
+          </div>
+        )}
+        {kitchenError && (
+          <div className="bg-red-50 border-b border-red-200 px-4 py-2 flex items-center gap-2 text-sm text-red-700">
+            <AlertCircle size={16} />
+            {kitchenError}
+          </div>
+        )}
+        {printSuccess && (
+          <div className="bg-green-50 border-b border-green-200 px-4 py-2 flex items-center gap-2 text-sm text-green-700">
+            <CheckCircle2 size={16} />
+            تمت الطباعة بنجاح
+          </div>
+        )}
+
+        {/* Order type selector */}
+        <div className="bg-white border-b border-gray-200 px-4 py-2.5 flex items-center gap-2">
+          <OrderTypeButton active={orderType === 'dine-in'} icon={Utensils} label={ORDER_TYPE_LABELS['dine-in']} onClick={() => setOrderType('dine-in')} />
+          <OrderTypeButton active={orderType === 'takeaway'} icon={Store} label={ORDER_TYPE_LABELS['takeaway']} onClick={() => setOrderType('takeaway')} />
+          <OrderTypeButton active={orderType === 'delivery'} icon={Bike} label={ORDER_TYPE_LABELS['delivery']} onClick={() => setOrderType('delivery')} />
+          <OrderTypeButton active={orderType === 'talabat'} icon={ShoppingBag} label={ORDER_TYPE_LABELS['talabat']} onClick={() => setOrderType('talabat')} />
+          {orderType === 'dine-in' && (
+            <Select
+              value={tableLabel}
+              onChange={(e) => updateCurrentOrder({ tableLabel: e.target.value })}
+              className="w-40"
+            >
+              <option value="">اختر الطاولة</option>
+              {settings.dineInAreas.map((a) => (
+                <option key={a.id} value={a.name}>{a.name}</option>
+              ))}
+            </Select>
+          )}
+          {orderType === 'delivery' && (
+            <Select
+              value={deliveryZoneId}
+              onChange={(e) => updateCurrentOrder({ deliveryZoneId: e.target.value })}
+              className="w-48"
+            >
+              <option value="">اختر منطقة التوصيل</option>
+              {settings.deliveryZones.map((z) => (
+                <option key={z.id} value={z.id}>{z.name} ({formatMoney(z.fee)})</option>
+              ))}
+            </Select>
+          )}
+        </div>
+
+        {/* Category tabs */}
+        <div className="bg-white border-b border-gray-200 px-4 py-2 flex gap-2 overflow-x-auto no-scrollbar">
+          {settings.categories.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => setActiveCategoryId(cat.id)}
+              className={`px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-all ${
+                activeCategoryId === cat.id
+                  ? 'text-white shadow-md'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+              style={activeCategoryId === cat.id ? { backgroundColor: cat.color } : {}}
+            >
+              {cat.name}
+            </button>
+          ))}
+        </div>
+
+        {/* Products grid */}
+        <div className="flex-1 overflow-y-auto p-4">
+          {!currentOrderId ? (
+            <div className="flex flex-col items-center justify-center h-full text-gray-400">
+              <ShoppingCart size={48} className="mb-3" />
+              <p className="text-sm mb-3">لا يوجد طلب نشط. اضغط "طلب جديد" للبدء.</p>
+              <Button onClick={() => newOrder()}>
+                <FilePlus size={18} className="inline ml-1" />
+                طلب جديد
+              </Button>
+            </div>
+          ) : filteredProducts.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-gray-400">
+              <ShoppingCart size={48} className="mb-3" />
+              <p className="text-sm">لا توجد منتجات. أضف منتجات من شاشة المنتجات.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+              {filteredProducts.map((product) => {
+                const price = getProductPrice(product.prices, orderType);
+                return (
+                  <button
+                    key={product.id}
+                    onClick={() => addToCart(product.id)}
+                    className="bg-white rounded-2xl border border-gray-200 p-3 flex flex-col items-center gap-2 hover:shadow-lg hover:border-blue-300 active:scale-95 transition-all"
+                  >
+                    <div className="w-full aspect-square rounded-xl bg-gray-100 overflow-hidden flex items-center justify-center">
+                      {product.image ? (
+                        <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <Utensils size={32} className="text-gray-300" />
+                      )}
+                    </div>
+                    <p className="text-sm font-semibold text-gray-700 text-center leading-tight line-clamp-2">{product.name}</p>
+                    <p className="text-sm font-bold text-blue-600">{formatMoney(price)}</p>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Right: Cart panel */}
+      <div className="w-80 lg:w-96 bg-white border-r border-gray-200 flex flex-col flex-shrink-0">
+        <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ShoppingCart size={20} className="text-blue-600" />
+            <h3 className="font-bold text-gray-800">السلة</h3>
+            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold">
+              {cart.reduce((s, i) => s + i.qty, 0)}
+            </span>
+            {currentOrder && (
+              <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
+                currentOrder.status === 'sent' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+              }`}>
+                {currentOrder.status === 'sent' ? 'أُرسل للمطبخ' : 'مفتوح'}
+              </span>
+            )}
+          </div>
+          {cart.length > 0 && (
+            <button
+              onClick={() => voidOrder()}
+              className="text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition-colors"
+              title="إلغاء الطلب"
+            >
+              <Trash2 size={18} />
+            </button>
+          )}
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+          {cart.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-gray-300">
+              <ShoppingCart size={48} className="mb-2" />
+              <p className="text-sm">السلة فارغة</p>
+            </div>
+          ) : (
+            <div className="p-3 space-y-2">
+              {cart.map((item, i) => (
+                <div key={i} className="bg-gray-50 rounded-xl p-3 animate-fade-in">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <p className="text-sm font-semibold text-gray-800 flex-1">{item.name}</p>
+                    <button onClick={() => removeItem(i)} className="text-red-400 hover:text-red-600 p-1">
+                      <XCircle size={16} />
+                    </button>
+                  </div>
+                  {item.note && (
+                    <p className="text-xs text-orange-600 bg-orange-50 rounded-lg px-2 py-1 mb-2">
+                      {item.note}
+                    </p>
+                  )}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => changeQty(i, -1)} className="w-8 h-8 rounded-lg bg-white border border-gray-200 flex items-center justify-center hover:bg-gray-100 active:scale-90 transition-all">
+                        <Minus size={16} className="text-gray-600" />
+                      </button>
+                      <span className="text-sm font-bold w-8 text-center">{item.qty}</span>
+                      <button onClick={() => changeQty(i, 1)} className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 active:scale-90 transition-all">
+                        <Plus size={16} />
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => openNoteForItem(i)} className="text-gray-400 hover:text-orange-500 p-1">
+                        <StickyNote size={16} />
+                      </button>
+                      <span className="text-sm font-bold text-gray-700">{formatMoney(item.price * item.qty)}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {showCustomerForm && currentOrderId && (
+          <div className="border-t border-gray-100 px-4 py-3 space-y-2 bg-orange-50/50">
+            <p className="text-xs font-bold text-orange-700 flex items-center gap-1">
+              <User size={14} className="inline" />
+              بيانات العميل
+            </p>
+            <Input
+              placeholder="اسم العميل"
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+              className="text-sm"
+            />
+            <Input
+              type="tel"
+              placeholder="رقم الهاتف"
+              value={customerPhone}
+              onChange={(e) => setCustomerPhone(e.target.value)}
+              className="text-sm"
+            />
+            <Input
+              placeholder="المنطقة / العنوان"
+              value={customerAddress}
+              onChange={(e) => setCustomerAddress(e.target.value)}
+              className="text-sm"
+            />
+          </div>
+        )}
+
+        <div className="border-t border-gray-100 p-4 space-y-2">
+          <div className="flex justify-between text-sm text-gray-500">
+            <span>المجموع الفرعي / Subtotal</span>
+            <span className="font-semibold">{formatMoney(subtotal)}</span>
+          </div>
+          {orderDiscount > 0 && (
+            <div className="flex justify-between text-sm text-red-500">
+              <span>الخصم / Discount</span>
+              <span className="font-semibold">-{formatMoney(orderDiscount)}</span>
+            </div>
+          )}
+          {deliveryFee > 0 && (
+            <div className="flex justify-between text-sm text-gray-500">
+              <span>رسوم التوصيل / Delivery</span>
+              <span className="font-semibold">{formatMoney(deliveryFee)}</span>
+            </div>
+          )}
+          <div className="flex justify-between text-sm text-gray-500">
+            <span>ضريبة القيمة المضافة / VAT ({settings.financials.vatValue}%)</span>
+            <span className="font-semibold">{formatMoney(estimatedVat)}</span>
+          </div>
+          <div className="flex justify-between items-center pt-2 border-t border-gray-100">
+            <span className="text-base font-bold text-gray-800">المجموع النهائي / Total</span>
+            <span className="text-2xl font-bold text-blue-600">{formatMoney(total + estimatedVat)}</span>
+          </div>
+          <Button size="lg" className="w-full" disabled={cart.length === 0} onClick={() => setCheckoutOpen(true)}>
+            <CreditCard size={20} className="inline ml-2" />
+            الدفع
+          </Button>
+        </div>
+      </div>
+
+      {/* Note Modal */}
+      <Modal open={noteModalOpen} onClose={() => setNoteModalOpen(false)} title="ملاحظات الصنف" size="sm"
+        footer={<><Button variant="secondary" onClick={() => setNoteModalOpen(false)}>إلغاء</Button><Button onClick={saveNote}>حفظ</Button></>}
+      >
+        <TextArea rows={4} placeholder="أضف ملاحظة للصنف..." value={noteText} onChange={(e) => setNoteText(e.target.value)} />
+      </Modal>
+
+      {/* Discount Modal */}
+      <Modal open={discountModalOpen} onClose={() => setDiscountModalOpen(false)} title="خصم على الفاتورة" size="sm"
+        footer={<><Button variant="secondary" onClick={() => setDiscountModalOpen(false)}>إلغاء</Button><Button onClick={applyDiscount}>تطبيق</Button></>}
+      >
+        <Input type="number" placeholder="قيمة الخصم" value={discountValue} onChange={(e) => setDiscountValue(e.target.value)} autoFocus />
+        {orderDiscount > 0 && (
+          <button onClick={() => { updateCurrentOrder({ discount: 0 }); setDiscountModalOpen(false); }} className="text-sm text-red-500 mt-3">
+            إزالة الخصم الحالي ({formatMoney(orderDiscount)})
+          </button>
+        )}
+      </Modal>
+
+      {/* Tags Modal */}
+      <Modal open={tagsModalOpen} onClose={() => setTagsModalOpen(false)} title="وسوم الطلب" size="sm">
+        {settings.tags.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-4">لا توجد وسوم. أضف وسوماً من شاشة الوسوم.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {settings.tags.map((tag) => {
+              const active = orderTagIds.includes(tag.id);
+              return (
+                <button
+                  key={tag.id}
+                  onClick={() => updateCurrentOrder({ tagIds: active ? orderTagIds.filter((id) => id !== tag.id) : [...orderTagIds, tag.id] })}
+                  className={`px-3 py-2 rounded-xl text-sm font-semibold transition-all active:scale-95 ${
+                    active ? 'text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                  style={active ? { backgroundColor: tag.color } : {}}
+                >
+                  {tag.name}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {orderTagIds.length > 0 && (
+          <button onClick={() => updateCurrentOrder({ tagIds: [] })} className="text-xs text-red-500 mt-3">
+            مسح جميع الوسوم
+          </button>
+        )}
+      </Modal>
+
+      {/* Active Orders Modal */}
+      <Modal open={ordersListOpen} onClose={() => setOrdersListOpen(false)} title="الطلبات النشطة" size="md"
+        footer={<Button variant="secondary" onClick={() => setOrdersListOpen(false)}>إغلاق</Button>}
+      >
+        {settings.activeOrders.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-4">لا توجد طلبات نشطة</p>
+        ) : (
+          <div className="space-y-2">
+            {settings.activeOrders.map((o) => (
+              <div key={o.id} className={`flex items-center gap-3 p-3 rounded-xl border transition-colors ${
+                o.id === currentOrderId ? 'border-blue-300 bg-blue-50' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
+              }`}>
+                <button onClick={() => switchOrder(o.id)} className="flex-1 text-right">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-bold text-gray-800">{ORDER_TYPE_LABELS[o.type]}</span>
+                    {o.tableLabel && <span className="text-xs text-gray-500">طاولة: {o.tableLabel}</span>}
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
+                      o.status === 'sent' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                    }`}>
+                      {o.status === 'sent' ? 'أُرسل' : 'مفتوح'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500">{o.items.length} صنف · {formatMoney(o.items.reduce((s, i) => s + i.price * i.qty, 0))}</p>
+                </button>
+                <button onClick={() => deleteActiveOrder(o.id)} className="p-2 rounded-lg text-red-500 hover:bg-red-50 transition-colors">
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <Button className="w-full mt-3" onClick={() => { newOrder(); setOrdersListOpen(false); }}>
+          <FilePlus size={18} className="inline ml-1" />
+          طلب جديد
+        </Button>
+      </Modal>
+
+      {/* More Modal */}
+      <Modal open={moreModalOpen} onClose={() => setMoreModalOpen(false)} title="المزيد" size="sm">
+        <div className="space-y-2">
+          <MoreItem icon={Tag} label="إدارة الوسوم" onClick={() => { setMoreModalOpen(false); setTagsModalOpen(true); }} />
+          <MoreItem icon={CreditCard} label="استرداد (Refund)" onClick={() => { setMoreModalOpen(false); setPinAction('refund'); setPinPadOpen(true); }} />
+        </div>
+      </Modal>
+
+      {/* Refund Modal */}
+      <Modal open={refundModalOpen} onClose={() => setRefundModalOpen(false)} title="استرداد المبلغ" size="sm"
+        footer={<><Button variant="secondary" onClick={() => setRefundModalOpen(false)}>إلغاء</Button><Button variant="danger" onClick={processRefund} disabled={!refundAmount}>تأكيد الاسترداد</Button></>}
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-gray-500">أدخل رقم الطلب للاسترداد:</p>
+          <Input
+            placeholder="رقم الطلب"
+            value={refundOrder?.number.toString() ?? ''}
+            onChange={() => {}}
+          />
+          <Input
+            type="number"
+            placeholder="مبلغ الاسترداد"
+            value={refundAmount}
+            onChange={(e) => setRefundAmount(e.target.value)}
+          />
+          <Input
+            placeholder="سبب الاسترداد"
+            value={refundReason}
+            onChange={(e) => setRefundReason(e.target.value)}
+          />
+        </div>
+      </Modal>
+
+      {/* PIN Pad */}
+      {pinPadOpen && (
+        <Modal open={pinPadOpen} onClose={() => setPinPadOpen(false)} title="صلاحية المدير" size="sm">
+          <PinPad
+            expectedPin={settings.managerPin}
+            onSuccess={onPinSuccess}
+            onCancel={() => { setPinPadOpen(false); setPinAction(null); setConfirmVoidOpen(false); }}
+          />
+        </Modal>
+      )}
+
+      <ConfirmDialog
+        open={confirmVoidOpen}
+        title="إلغاء الطلب"
+        message="هل أنت متأكد من إلغاء هذا الطلب؟ يتطلب رمز المدير."
+        confirmLabel="متابعة"
+        onConfirm={() => voidOrder()}
+        onCancel={() => setConfirmVoidOpen(false)}
+      />
+
+      {checkoutOpen && currentOrder && (
+        <CheckoutModal
+          subtotal={subtotal}
+          discount={orderDiscount}
+          deliveryFee={deliveryFee}
+          financials={settings.financials}
+          onClose={() => setCheckoutOpen(false)}
+          onComplete={completeOrder}
+        />
+      )}
+
+      {receiptOpen && lastOrder && (
+        <Receipt
+          order={lastOrder}
+          onClose={() => setReceiptOpen(false)}
+          onPrint={handlePrintReceipt}
+        />
+      )}
+
+      {kitchenPreviewOrder && (
+        <KitchenTicket
+          order={kitchenPreviewOrder}
+          onClose={() => setKitchenPreviewOrder(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function TopButton({ icon: Icon, label, onClick, variant, disabled }: {
+  icon: typeof Printer;
+  label: string;
+  onClick: () => void;
+  variant?: 'danger' | 'primary';
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed ${
+        variant === 'danger'
+          ? 'bg-red-50 text-red-600 hover:bg-red-100'
+          : variant === 'primary'
+          ? 'bg-blue-600 text-white hover:bg-blue-700'
+          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+      }`}
+    >
+      <Icon size={16} />
+      <span className="hidden sm:inline">{label}</span>
+    </button>
+  );
+}
+
+function OrderTypeButton({ active, icon: Icon, label, onClick }: {
+  active: boolean;
+  icon: typeof Utensils;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all active:scale-95 ${
+        active ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+      }`}
+    >
+      <Icon size={18} />
+      {label}
+    </button>
+  );
+}
+
+function MoreItem({ icon: Icon, label, onClick }: {
+  icon: typeof User;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-gray-100 transition-colors text-right"
+    >
+      <Icon size={20} className="text-gray-500" />
+      <span className="text-sm font-semibold text-gray-700">{label}</span>
+    </button>
+  );
+}
