@@ -255,6 +255,7 @@ export interface Settings {
   users: User[];
   auditLog: AuditEntry[];
   activeOrders: ActiveOrder[];
+  orderCounter?: number;
 }
 
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
