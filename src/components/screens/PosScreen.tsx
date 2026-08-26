@@ -88,7 +88,6 @@ export function PosScreen() {
   );
   const total = Math.max(0, subtotal - orderDiscount + deliveryFee);
 
-  // ✅ حساب الضريبة المقدرة للمعاينة
   const estimatedVat = useMemo(
     () => Math.round((subtotal - orderDiscount) * (settings.financials?.vatValue || 15)) / 100,
     [subtotal, orderDiscount, settings.financials?.vatValue]
@@ -97,6 +96,8 @@ export function PosScreen() {
   const currentCustomer: CustomerInfo | undefined = (customerName || customerPhone || customerAddress)
     ? { name: customerName || undefined, phone: customerPhone || undefined, address: customerAddress || undefined }
     : undefined;
+
+  const showCustomerForm = orderType === 'delivery' || orderType === 'talabat';
 
   const updateCurrentOrder = (patch: Partial<ActiveOrder>) => {
     if (!currentOrderId) return;
@@ -237,16 +238,13 @@ export function PosScreen() {
     setPinAction(null);
   };
 
-  // ✅ دالة completeOrder المعدلة مع الترقيم التلقائي باستخدام orderCounter
   const completeOrder = (paymentMethod: PaymentMethod, serviceCharge: number, tax: number, closerName: string) => {
     if (cart.length === 0) return;
 
-    // ✅ تعريف currentCustomer داخل الدالة (كإجراء احتياطي)
     const orderCustomer: CustomerInfo | undefined = (customerName || customerPhone || customerAddress)
       ? { name: customerName || undefined, phone: customerPhone || undefined, address: customerAddress || undefined }
       : undefined;
 
-    // ✅ الحصول على الرقم التالي من العداد العام
     const nextOrderNumber = (settings.orderCounter || 0) + 1;
 
     const finalTotal = Math.max(0, subtotal - orderDiscount + deliveryFee + serviceCharge + tax);
@@ -283,7 +281,7 @@ export function PosScreen() {
         ...prev,
         orders,
         shifts,
-        orderCounter: nextOrderNumber, // ✅ تحديث العداد
+        orderCounter: nextOrderNumber,
         activeOrders: prev.activeOrders.filter((o) => o.id !== currentOrderId),
       };
     });
@@ -349,7 +347,6 @@ export function PosScreen() {
   return (
     <div className="flex h-full" dir="rtl">
       <div className="flex-1 flex flex-col bg-gray-50">
-        {/* Top utility bar */}
         <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <div className="relative flex-1 max-w-xs">
@@ -369,7 +366,6 @@ export function PosScreen() {
               label={`الطلبات النشطة (${settings.activeOrders.length})`}
               onClick={() => setOrdersListOpen(true)}
             />
-            {/* ✅ زر الطباعة المعدل */}
             <TopButton 
               icon={Printer} 
               label="طباعة" 
@@ -412,7 +408,6 @@ export function PosScreen() {
           </div>
         </div>
 
-        {/* Print status banners */}
         {printError && (
           <div className="bg-red-50 border-b border-red-200 px-4 py-2 flex items-center gap-2 text-sm text-red-700">
             <AlertCircle size={16} />
@@ -432,7 +427,6 @@ export function PosScreen() {
           </div>
         )}
 
-        {/* Order type selector */}
         <div className="bg-white border-b border-gray-200 px-4 py-2.5 flex items-center gap-2">
           <OrderTypeButton active={orderType === 'dine-in'} icon={Utensils} label={ORDER_TYPE_LABELS['dine-in']} onClick={() => setOrderType('dine-in')} />
           <OrderTypeButton active={orderType === 'takeaway'} icon={Store} label={ORDER_TYPE_LABELS['takeaway']} onClick={() => setOrderType('takeaway')} />
@@ -464,7 +458,6 @@ export function PosScreen() {
           )}
         </div>
 
-        {/* Category tabs */}
         <div className="bg-white border-b border-gray-200 px-4 py-2 flex gap-2 overflow-x-auto no-scrollbar">
           {settings.categories.map((cat) => (
             <button
@@ -482,7 +475,6 @@ export function PosScreen() {
           ))}
         </div>
 
-        {/* Products grid */}
         <div className="flex-1 overflow-y-auto p-4">
           {!currentOrderId ? (
             <div className="flex flex-col items-center justify-center h-full text-gray-400">
@@ -525,7 +517,6 @@ export function PosScreen() {
         </div>
       </div>
 
-      {/* Right: Cart panel */}
       <div className="w-80 lg:w-96 bg-white border-r border-gray-200 flex flex-col flex-shrink-0">
         <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -653,14 +644,12 @@ export function PosScreen() {
         </div>
       </div>
 
-      {/* Note Modal */}
       <Modal open={noteModalOpen} onClose={() => setNoteModalOpen(false)} title="ملاحظات الصنف" size="sm"
         footer={<><Button variant="secondary" onClick={() => setNoteModalOpen(false)}>إلغاء</Button><Button onClick={saveNote}>حفظ</Button></>}
       >
         <TextArea rows={4} placeholder="أضف ملاحظة للصنف..." value={noteText} onChange={(e) => setNoteText(e.target.value)} />
       </Modal>
 
-      {/* Discount Modal */}
       <Modal open={discountModalOpen} onClose={() => setDiscountModalOpen(false)} title="خصم على الفاتورة" size="sm"
         footer={<><Button variant="secondary" onClick={() => setDiscountModalOpen(false)}>إلغاء</Button><Button onClick={applyDiscount}>تطبيق</Button></>}
       >
@@ -672,7 +661,6 @@ export function PosScreen() {
         )}
       </Modal>
 
-      {/* Tags Modal */}
       <Modal open={tagsModalOpen} onClose={() => setTagsModalOpen(false)} title="وسوم الطلب" size="sm">
         {settings.tags.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-4">لا توجد وسوم. أضف وسوماً من شاشة الوسوم.</p>
@@ -702,7 +690,6 @@ export function PosScreen() {
         )}
       </Modal>
 
-      {/* Active Orders Modal */}
       <Modal open={ordersListOpen} onClose={() => setOrdersListOpen(false)} title="الطلبات النشطة" size="md"
         footer={<Button variant="secondary" onClick={() => setOrdersListOpen(false)}>إغلاق</Button>}
       >
@@ -739,7 +726,6 @@ export function PosScreen() {
         </Button>
       </Modal>
 
-      {/* More Modal */}
       <Modal open={moreModalOpen} onClose={() => setMoreModalOpen(false)} title="المزيد" size="sm">
         <div className="space-y-2">
           <MoreItem icon={Tag} label="إدارة الوسوم" onClick={() => { setMoreModalOpen(false); setTagsModalOpen(true); }} />
@@ -747,7 +733,6 @@ export function PosScreen() {
         </div>
       </Modal>
 
-      {/* Refund Modal */}
       <Modal open={refundModalOpen} onClose={() => setRefundModalOpen(false)} title="استرداد المبلغ" size="sm"
         footer={<><Button variant="secondary" onClick={() => setRefundModalOpen(false)}>إلغاء</Button><Button variant="danger" onClick={processRefund} disabled={!refundAmount}>تأكيد الاسترداد</Button></>}
       >
@@ -772,7 +757,6 @@ export function PosScreen() {
         </div>
       </Modal>
 
-      {/* PIN Pad */}
       {pinPadOpen && (
         <Modal open={pinPadOpen} onClose={() => setPinPadOpen(false)} title="صلاحية المدير" size="sm">
           <PinPad
@@ -803,7 +787,6 @@ export function PosScreen() {
         />
       )}
 
-      {/* ✅ مكون Receipt المعدل مع isPreview */}
       {receiptOpen && lastOrder && (
         <Receipt
           order={lastOrder}
