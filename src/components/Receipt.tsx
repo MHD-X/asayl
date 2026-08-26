@@ -9,6 +9,7 @@ interface ReceiptProps {
   order: Order;
   onClose: () => void;
   onPrint?: () => void;
+  isPreview?: boolean;
 }
 
 const ORDER_TYPE_EN: Record<string, string> = {
@@ -18,9 +19,10 @@ const ORDER_TYPE_EN: Record<string, string> = {
   talabat: 'Talabat',
 };
 
-export function Receipt({ order, onClose, onPrint }: ReceiptProps) {
+export function Receipt({ order, onClose, onPrint, isPreview = false }: ReceiptProps) {
   const { settings } = useSettings();
   const r = settings.receiptSettings;
+  const branding = settings.branding;
   const itemCount = order.items.reduce((s, i) => s + i.qty, 0);
 
   const handlePrint = () => {
@@ -31,8 +33,12 @@ export function Receipt({ order, onClose, onPrint }: ReceiptProps) {
     }
   };
 
+  // ✅ دمج اسم المطعم من الإعدادات
+  const restaurantName = r.restaurantName || branding.name || 'مطعم أسايل';
+  const logo = branding.logo;
+
   return (
-    <Modal open onClose={onClose} title="معاينة الفاتورة قبل الطباعة" size="md"
+    <Modal open onClose={onClose} title={isPreview ? 'معاينة الفاتورة (غير مدفوعة)' : 'معاينة الفاتورة'} size="md"
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
@@ -41,7 +47,7 @@ export function Receipt({ order, onClose, onPrint }: ReceiptProps) {
           </Button>
           <Button onClick={handlePrint}>
             <Printer size={18} className="inline ml-2" />
-            تأكيد وطباعة
+            {isPreview ? 'طباعة معاينة' : 'تأكيد وطباعة'}
           </Button>
         </>
       }
@@ -52,10 +58,22 @@ export function Receipt({ order, onClose, onPrint }: ReceiptProps) {
           dir="rtl"
           style={{ width: '80mm', padding: '4mm 3mm' }}
         >
-          {/* Header */}
+          {/* ✅ Header مع الشعار */}
           <div className="text-center mb-2">
-            {r.restaurantName && (
-              <p className="font-bold text-base leading-tight">{r.restaurantName}</p>
+            {logo && (
+              <img 
+                src={logo} 
+                alt="شعار المطعم" 
+                style={{ 
+                  maxWidth: '60mm', 
+                  height: 'auto', 
+                  margin: '0 auto 4px auto',
+                  display: 'block'
+                }} 
+              />
+            )}
+            {restaurantName && (
+              <p className="font-bold text-base leading-tight">{restaurantName}</p>
             )}
             {r.subtitle && (
               <p className="text-xs text-gray-600 mt-0.5">{r.subtitle}</p>
@@ -77,12 +95,6 @@ export function Receipt({ order, onClose, onPrint }: ReceiptProps) {
               <div className="flex justify-between">
                 <span>Name:</span>
                 <span className="font-semibold">{order.cashierName}</span>
-              </div>
-            )}
-            {r.showCashierName && (
-              <div className="flex justify-between">
-                <span>Phone:</span>
-                <span className="font-semibold">{r.phones || '-'}</span>
               </div>
             )}
             <div className="flex justify-between">
@@ -126,6 +138,9 @@ export function Receipt({ order, onClose, onPrint }: ReceiptProps) {
           {/* Prominent Order ID box */}
           <div className="border-2 border-gray-800 rounded my-2 text-center py-1.5">
             <p className="font-bold text-lg tracking-wide">Order# {order.number}</p>
+            {isPreview && (
+              <p className="text-xs text-amber-600 font-bold">⚠️ معاينة - غير مدفوعة</p>
+            )}
           </div>
 
           {/* Timestamps */}
