@@ -60,53 +60,72 @@ input[type="number"] {
   text-align: right;
 }
 
-/* Receipt & Kitchen print styles - 80mm thermal printer */
+/* ============================================
+   🖨️ إعدادات الطباعة للفاتورة الحرارية 80mm
+   ============================================ */
 @media print {
-  /* Hide everything by default */
-  body * {
-    visibility: hidden;
-  }
-
-  /* Show only the print area and its children */
-  .print-area,
-  .print-area * {
-    visibility: visible;
-  }
-
-  /* Anchor the print area at the top-left of the page */
-  .print-area {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 80mm;
-    max-width: 80mm;
-    min-width: 0;
-    margin: 0;
-    padding: 2mm 1mm;
-    font-size: 11px;
-    line-height: 1.35;
-    background: white !important;
-    color: #000 !important;
-    box-shadow: none !important;
-    border: none !important;
-    border-radius: 0 !important;
-  }
-
-  /* The wrapper around print-area must not collapse or hide */
-  .print-wrapper {
-    visibility: visible;
-    position: static;
-  }
-
-  /* Hide modal backdrop, header, footer, and all dashboard chrome */
+  /* ✅ إخفاء كل العناصر غير المرغوب فيها */
   .no-print,
   .modal-backdrop,
   .modal-header,
-  .modal-footer {
+  .modal-footer,
+  .modal-overlay,
+  button:not(.print-btn),
+  .print-wrapper > *:not(.print-area) {
     display: none !important;
   }
 
-  /* Reset the modal container so the print area escapes it cleanly */
+  /* ✅ إعدادات الصفحة */
+  @page {
+    size: 80mm auto;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* ✅ إعدادات الجسم */
+  body {
+    width: 80mm;
+    margin: 0;
+    padding: 0;
+    background: white !important;
+    font-size: 11px;
+    line-height: 1.4;
+  }
+
+  /* ✅ منطقة الطباعة */
+  .print-area {
+    width: 80mm !important;
+    max-width: 80mm !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 2mm 3mm !important;
+    background: white !important;
+    color: black !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    font-size: 11px;
+    line-height: 1.35;
+    font-family: 'Courier New', monospace;
+  }
+
+  /* ✅ إظهار محتويات منطقة الطباعة فقط */
+  .print-area,
+  .print-area * {
+    visibility: visible !important;
+  }
+
+  /* ✅ إخفاء كل شيء آخر */
+  body * {
+    visibility: hidden !important;
+  }
+
+  .print-area,
+  .print-area * {
+    visibility: visible !important;
+  }
+
+  /* ✅ إعادة تعيين حاوية المودال */
   .modal-container {
     position: static !important;
     background: transparent !important;
@@ -121,23 +140,96 @@ input[type="number"] {
     max-width: none !important;
   }
 
-  /* Hide the fixed overlay container that holds the modal */
   .modal-overlay {
     position: static !important;
     background: transparent !important;
     padding: 0 !important;
   }
 
-  /* Force body to 80mm width to prevent layout distortion */
-  body {
-    width: 80mm;
-    margin: 0;
-    padding: 0;
-    background: white;
+  .print-wrapper {
+    visibility: visible !important;
+    position: static !important;
   }
 
-  @page {
-    size: 80mm auto;
-    margin: 0;
+  /* ✅ منع تقسيم المحتوى بين صفحات */
+  .print-area * {
+    page-break-inside: avoid;
+    page-break-after: avoid;
+  }
+
+  /* ✅ منع ظهور أي خلفيات أو ألوان إضافية */
+  .print-area .bg-gray-50,
+  .print-area .bg-gray-100 {
+    background: white !important;
+  }
+
+  /* ✅ تنسيق الجداول */
+  .print-area table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .print-area td,
+  .print-area th {
+    padding: 2px 0;
+    font-size: 10px;
+  }
+
+  /* ✅ تنسيق الخطوط */
+  .print-area .font-bold {
+    font-weight: 700 !important;
+  }
+
+  .print-area .text-xs {
+    font-size: 9px !important;
+  }
+
+  .print-area .text-sm {
+    font-size: 10px !important;
+  }
+
+  .print-area .text-base {
+    font-size: 11px !important;
+  }
+
+  .print-area .text-lg {
+    font-size: 13px !important;
+  }
+
+  /* ✅ تنسيق الحدود */
+  .print-area .border-t {
+    border-top: 1px dashed #999 !important;
+  }
+
+  .print-area .border-b {
+    border-bottom: 1px dashed #999 !important;
+  }
+
+  .print-area .border-2 {
+    border: 2px solid #000 !important;
+  }
+
+  .print-area .border-gray-800 {
+    border-color: #000 !important;
+  }
+
+  .print-area .border-dashed {
+    border-style: dashed !important;
+  }
+
+  .print-area .border-dotted {
+    border-style: dotted !important;
+  }
+
+  .print-area .border-gray-400 {
+    border-color: #999 !important;
+  }
+
+  .print-area .border-gray-300 {
+    border-color: #ccc !important;
+  }
+
+  .print-area .border-gray-200 {
+    border-color: #ddd !important;
   }
 }
