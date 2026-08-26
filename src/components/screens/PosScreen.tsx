@@ -280,7 +280,8 @@ export function PosScreen() {
     });
     setLastOrder(order);
     setCheckoutOpen(false);
-    setReceiptOpen(true);
+    // ✅ منع فتح مكون Receipt الذي يسبب مشكلة الطباعة
+    // setReceiptOpen(true);  // تم التعليق
     setCustomerName('');
     setCustomerPhone('');
     setCustomerAddress('');
@@ -289,7 +290,7 @@ export function PosScreen() {
   };
 
   // =============================================
-  // ✅ دالة طباعة الفاتورة (معدلة بالكامل - تدعم المعاينة والطباعة الرسمية)
+  // ✅ دالة طباعة الفاتورة (معدلة بالكامل - تدعم المعاينة والطباعة الرسمية مع الشعار)
   // =============================================
   const handlePrintReceipt = () => {
     setPrintError('');
@@ -322,9 +323,10 @@ export function PosScreen() {
     }
 
     try {
-      // جلب إعدادات الفاتورة من النظام
+      // ✅ جلب إعدادات الفاتورة من النظام (بما فيها الشعار)
       const {
         restaurantName = 'مطعم أسايل',
+        logo = '',           // ✅ صورة الشعار (URL أو Base64)
         slogan = '',
         address = '',
         phone = '',
@@ -339,10 +341,10 @@ export function PosScreen() {
       // حساب طول الورق
       const itemsCount = orderToPrint.items.length;
       const lineHeight = 24;
-      const headerHeight = 200;
+      const headerHeight = 220;  // زيادة الارتفاع قليلاً لاستيعاب الشعار
       const footerHeight = 140;
       const totalHeight = headerHeight + (itemsCount * lineHeight) + footerHeight;
-      const paperHeight = Math.max(400, totalHeight);
+      const paperHeight = Math.max(450, totalHeight);
 
       // تنسيق نوع الطلب
       const orderTypeMap = {
@@ -401,6 +403,12 @@ export function PosScreen() {
                 border-bottom: 1px dashed #000;
                 padding-bottom: 6px;
                 margin-bottom: 6px;
+              }
+              .logo {
+                max-width: 60mm;
+                height: auto;
+                margin: 0 auto 4px auto;
+                display: block;
               }
               .title {
                 font-size: 16px;
@@ -482,6 +490,11 @@ export function PosScreen() {
                 pointer-events: none;
                 z-index: -1;
               }
+              .payment-method {
+                font-size: 10px;
+                color: #666;
+                margin-top: 2px;
+              }
             </style>
           </head>
           <body>
@@ -489,10 +502,11 @@ export function PosScreen() {
             <div class="receipt-content">
               <div>
                 <div class="header">
+                  ${logo ? `<img src="${logo}" alt="شعار المطعم" class="logo" />` : ''}
                   <div class="title">${receiptTitle}</div>
                   ${isPreview ? '<div class="preview-badge">⚠️ معاينة - غير مدفوعة</div>' : ''}
                   ${slogan ? `<div class="slogan">${slogan}</div>` : ''}
-                  ${address ? `<div class="address">${address}</div>` : ''}
+                  ${address ? `<div class="address">📍 ${address}</div>` : ''}
                   ${phone ? `<div class="phone">📞 ${phone}</div>` : ''}
                   ${taxId ? `<div class="tax-id">الرقم الضريبي: ${taxId}</div>` : ''}
                   <div class="divider"></div>
@@ -548,7 +562,7 @@ export function PosScreen() {
                     <span><strong>${orderToPrint.total.toFixed(2)} ${currency}</strong></span>
                   </div>
                   ${orderToPrint.paymentMethod ? `
-                    <div class="total-line" style="font-size:10px;color:#666;margin-top:2px;">
+                    <div class="total-line payment-method">
                       <span>طريقة الدفع</span>
                       <span>${orderToPrint.paymentMethod === 'cash' ? 'نقدي' : 'بطاقة'}</span>
                     </div>
