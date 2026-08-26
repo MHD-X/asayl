@@ -230,19 +230,17 @@ export function PosScreen() {
     setPinAction(null);
   };
 
-  // ✅ دالة completeOrder المعدلة مع الترقيم التلقائي
+  // ✅ دالة completeOrder المعدلة مع الترقيم التلقائي باستخدام orderCounter
   const completeOrder = (paymentMethod: PaymentMethod, serviceCharge: number, tax: number, closerName: string) => {
     if (cart.length === 0) return;
 
-    // ✅ الحصول على رقم الطلب التالي داخل الوردية
-    const currentShift = settings.shifts.find((s) => s.id === settings.currentShiftId);
-    const shiftOrderCount = currentShift?.orders?.length ?? 0;
-    const orderNumber = shiftOrderCount + 1;  // يبدأ من 1
+    // ✅ الحصول على الرقم التالي من العداد العام
+    const nextOrderNumber = (settings.orderCounter || 0) + 1;
 
     const finalTotal = Math.max(0, subtotal - orderDiscount + deliveryFee + serviceCharge + tax);
     const order: Order = {
       id: uid('order'),
-      number: orderNumber,
+      number: nextOrderNumber,
       type: orderType,
       tableLabel: orderType === 'dine-in' ? tableLabel : undefined,
       deliveryZoneId: orderType === 'delivery' ? deliveryZoneId : undefined,
@@ -273,6 +271,7 @@ export function PosScreen() {
         ...prev,
         orders,
         shifts,
+        orderCounter: nextOrderNumber, // ✅ تحديث العداد
         activeOrders: prev.activeOrders.filter((o) => o.id !== currentOrderId),
       };
     });
