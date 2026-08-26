@@ -289,27 +289,81 @@ export function PosScreen() {
   };
 
   // =============================================
-  // ✅ دالة طباعة الفاتورة (معدلة بالكامل)
+  // ✅ دالة طباعة الفاتورة (معدلة بالكامل - تدعم المعاينة والطباعة الرسمية)
   // =============================================
   const handlePrintReceipt = () => {
-    if (!lastOrder) return;
     setPrintError('');
 
+    // تحديد مصدر البيانات: lastOrder (بعد الدفع) أو cart (قبل الدفع)
+    const orderToPrint = lastOrder ?? (cart.length > 0 ? {
+      id: 'temp',
+      number: 0,
+      type: orderType,
+      tableLabel: orderType === 'dine-in' ? tableLabel : undefined,
+      deliveryZoneId: orderType === 'delivery' ? deliveryZoneId : undefined,
+      deliveryFee,
+      items: [...cart],
+      subtotal,
+      serviceCharge: 0,
+      tax: estimatedVat,
+      discount: orderDiscount,
+      total: total + estimatedVat,
+      paymentMethod: undefined,
+      cashierName: settings.cashierName || 'كاشير',
+      customer: currentCustomer,
+      createdAt: new Date().toISOString(),
+      tagIds: orderTagIds,
+      status: 'preview' as const,
+    } : null);
+
+    if (!orderToPrint) {
+      setPrintError('لا توجد منتجات في السلة للطباعة');
+      return;
+    }
+
     try {
-      // حساب طول الورق بناءً على عدد الأصناف
-      const itemsCount = lastOrder.items.length;
+      // جلب إعدادات الفاتورة من النظام
+      const {
+        restaurantName = 'مطعم أسايل',
+        slogan = '',
+        address = '',
+        phone = '',
+        taxId = '',
+        footer = 'شكراً لزيارتكم 🤍',
+        currency = 'ر.س',
+        showCashier = true,
+        showTimestamp = true,
+        showOrderType = true,
+      } = settings;
+
+      // حساب طول الورق
+      const itemsCount = orderToPrint.items.length;
       const lineHeight = 24;
-      const headerHeight = 170;
-      const footerHeight = 120;
+      const headerHeight = 200;
+      const footerHeight = 140;
       const totalHeight = headerHeight + (itemsCount * lineHeight) + footerHeight;
-      const paperHeight = Math.max(350, totalHeight);
+      const paperHeight = Math.max(400, totalHeight);
+
+      // تنسيق نوع الطلب
+      const orderTypeMap = {
+        'dine-in': 'صالة',
+        'takeaway': 'سفري',
+        'delivery': 'توصيل',
+        'talabat': 'طلبات',
+      };
+      const orderTypeLabel = orderTypeMap[orderToPrint.type as keyof typeof orderTypeMap] || orderToPrint.type;
+
+      // تحديد عنوان الفاتورة
+      const isPreview = orderToPrint.status === 'preview';
+      const receiptTitle = isPreview ? '🧾 معاينة الفاتورة' : '🧾 فاتورة';
+      const receiptSub = isPreview ? '(معاينة - غير مدفوعة)' : `رقم الفاتورة: #${orderToPrint.number}`;
 
       const receiptHTML = `
         <!DOCTYPE html>
         <html>
           <head>
             <meta charset="UTF-8">
-            <title>فاتورة #${lastOrder.number}</title>
+            <title>${isPreview ? 'معاينة الفاتورة' : `فاتورة #${orderToPrint.number}`}</title>
             <style>
               @page {
                 size: 80mm ${paperHeight}px;
@@ -345,7 +399,7 @@ export function PosScreen() {
               .header {
                 text-align: center;
                 border-bottom: 1px dashed #000;
-                padding-bottom: 4px;
+                padding-bottom: 6px;
                 margin-bottom: 6px;
               }
               .title {
@@ -353,9 +407,35 @@ export function PosScreen() {
                 font-weight: bold;
                 margin: 0;
               }
+              .preview-badge {
+                font-size: 11px;
+                color: #e67e22;
+                font-weight: bold;
+                margin: 2px 0;
+              }
+              .slogan {
+                font-size: 11px;
+                color: #555;
+                margin: 2px 0;
+              }
               .sub {
                 font-size: 10px;
                 margin: 1px 0;
+              }
+              .address {
+                font-size: 9px;
+                color: #666;
+                margin: 1px 0;
+              }
+              .tax-id {
+                font-size: 9px;
+                color: #666;
+                margin-top: 2px;
+              }
+              .phone {
+                font-size: 9px;
+                color: #666;
+                margin-top: 2px;
               }
               table {
                 width: 100%;
@@ -369,12 +449,19 @@ export function PosScreen() {
               .right { text-align: right; }
               .center { text-align: center; }
               .left { text-align: left; }
-              .total {
+              .divider {
                 border-top: 1px dashed #000;
+                margin: 4px 0;
+              }
+              .total {
                 margin-top: 4px;
                 padding-top: 4px;
                 font-weight: bold;
                 font-size: 13px;
+              }
+              .total-line {
+                display: flex;
+                justify-content: space-between;
               }
               .footer {
                 text-align: center;
@@ -382,17 +469,37 @@ export function PosScreen() {
                 margin-top: 6px;
                 padding-top: 6px;
                 font-size: 10px;
+                color: #555;
               }
-              .print-only { display: block; }
+              .watermark {
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%) rotate(-30deg);
+                font-size: 30px;
+                color: rgba(255, 0, 0, 0.08);
+                font-weight: bold;
+                pointer-events: none;
+                z-index: -1;
+              }
             </style>
           </head>
           <body>
+            ${isPreview ? '<div class="watermark">معاينة</div>' : ''}
             <div class="receipt-content">
               <div>
                 <div class="header">
-                  <div class="title">🧾 مطعم أسايل</div>
-                  <div class="sub">رقم الفاتورة: #${lastOrder.number}</div>
-                  <div class="sub">${new Date(lastOrder.createdAt).toLocaleDateString('ar-EG')} - ${new Date(lastOrder.createdAt).toLocaleTimeString('ar-EG')}</div>
+                  <div class="title">${receiptTitle}</div>
+                  ${isPreview ? '<div class="preview-badge">⚠️ معاينة - غير مدفوعة</div>' : ''}
+                  ${slogan ? `<div class="slogan">${slogan}</div>` : ''}
+                  ${address ? `<div class="address">${address}</div>` : ''}
+                  ${phone ? `<div class="phone">📞 ${phone}</div>` : ''}
+                  ${taxId ? `<div class="tax-id">الرقم الضريبي: ${taxId}</div>` : ''}
+                  <div class="divider"></div>
+                  <div class="sub">${receiptSub}</div>
+                  ${showTimestamp ? `<div class="sub">${new Date(orderToPrint.createdAt).toLocaleDateString('ar-EG')} - ${new Date(orderToPrint.createdAt).toLocaleTimeString('ar-EG')}</div>` : ''}
+                  ${showOrderType ? `<div class="sub">نوع الطلب: ${orderTypeLabel}</div>` : ''}
+                  ${showCashier && orderToPrint.cashierName ? `<div class="sub">الكاشير: ${orderToPrint.cashierName}</div>` : ''}
                 </div>
 
                 <table>
@@ -401,33 +508,75 @@ export function PosScreen() {
                     <td class="center"><strong>الكمية</strong></td>
                     <td class="left"><strong>السعر</strong></td>
                   </tr>
-                  ${lastOrder.items.map(item => `
+                  ${orderToPrint.items.map(item => `
                     <tr>
                       <td class="right">${item.name}</td>
                       <td class="center">${item.qty}</td>
-                      <td class="left">${(item.price * item.qty).toFixed(2)} ر.س</td>
+                      <td class="left">${(item.price * item.qty).toFixed(2)} ${currency}</td>
                     </tr>
                   `).join('')}
                 </table>
 
+                <div class="divider"></div>
+
                 <div class="total">
-                  <div>المجموع: ${lastOrder.total.toFixed(2)} ر.س</div>
+                  <div class="total-line">
+                    <span>المجموع الفرعي</span>
+                    <span>${orderToPrint.subtotal.toFixed(2)} ${currency}</span>
+                  </div>
+                  ${orderToPrint.discount > 0 ? `
+                    <div class="total-line" style="color:red;">
+                      <span>الخصم</span>
+                      <span>-${orderToPrint.discount.toFixed(2)} ${currency}</span>
+                    </div>
+                  ` : ''}
+                  ${orderToPrint.deliveryFee > 0 ? `
+                    <div class="total-line">
+                      <span>رسوم التوصيل</span>
+                      <span>${orderToPrint.deliveryFee.toFixed(2)} ${currency}</span>
+                    </div>
+                  ` : ''}
+                  ${orderToPrint.tax > 0 ? `
+                    <div class="total-line">
+                      <span>الضريبة (${settings.financials?.vatValue || 15}%)</span>
+                      <span>${orderToPrint.tax.toFixed(2)} ${currency}</span>
+                    </div>
+                  ` : ''}
+                  <div class="divider"></div>
+                  <div class="total-line" style="font-size:14px;">
+                    <span><strong>المجموع النهائي</strong></span>
+                    <span><strong>${orderToPrint.total.toFixed(2)} ${currency}</strong></span>
+                  </div>
+                  ${orderToPrint.paymentMethod ? `
+                    <div class="total-line" style="font-size:10px;color:#666;margin-top:2px;">
+                      <span>طريقة الدفع</span>
+                      <span>${orderToPrint.paymentMethod === 'cash' ? 'نقدي' : 'بطاقة'}</span>
+                    </div>
+                  ` : ''}
+                  ${isPreview ? `
+                    <div class="total-line" style="font-size:10px;color:#e67e22;margin-top:4px;">
+                      <span>⚠️ هذه معاينة فقط</span>
+                      <span>غير مدفوعة</span>
+                    </div>
+                  ` : ''}
                 </div>
               </div>
 
-              <div class="footer">
-                شكراً لزيارتكم 🤍
+              <div>
+                <div class="footer">
+                  ${footer}
+                </div>
               </div>
-            </div>
 
-            <script>
-              window.onload = function() {
-                window.print();
-                setTimeout(function() {
-                  window.close();
-                }, 500);
-              };
-            </script>
+              <script>
+                window.onload = function() {
+                  window.print();
+                  setTimeout(function() {
+                    window.close();
+                  }, 500);
+                };
+              </script>
+            </div>
           </body>
         </html>
       `;
@@ -475,7 +624,7 @@ export function PosScreen() {
       const headerHeight = 160;
       const footerHeight = 100;
       const totalHeight = headerHeight + (itemsCount * lineHeight) + footerHeight;
-      const paperHeight = Math.max(300, totalHeight);
+      const paperHeight = Math.max(350, totalHeight);
 
       const ticketHTML = `
         <!DOCTYPE html>
@@ -656,7 +805,7 @@ export function PosScreen() {
               label={`الطلبات النشطة (${settings.activeOrders.length})`}
               onClick={() => setOrdersListOpen(true)}
             />
-            <TopButton icon={Printer} label="طباعة" onClick={() => lastOrder && handlePrintReceipt()} />
+            <TopButton icon={Printer} label="طباعة" onClick={() => (lastOrder || cart.length > 0) && handlePrintReceipt()} />
             <TopButton icon={ChefHat} label="مطبخ" onClick={handlePrintKitchen} />
             <TopButton icon={XCircle} label="إلغاء" variant="danger" onClick={() => cart.length > 0 ? setConfirmVoidOpen(true) : voidOrder()} disabled={!currentOrderId} />
             <TopButton icon={Percent} label="خصم" onClick={() => { setDiscountValue(String(orderDiscount || '')); setDiscountModalOpen(true); }} disabled={!currentOrderId} />
