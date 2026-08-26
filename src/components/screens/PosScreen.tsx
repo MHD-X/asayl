@@ -158,20 +158,36 @@ export function PosScreen() {
     updateCurrentOrder({ type });
   };
 
-  const addToCart = (productId: string) => {
-    const product = settings.products.find((p) => p.id === productId);
-    if (!product) return;
-    const price = getProductPrice(product.prices, orderType);
-    updateCart((prev) => {
-      const existing = prev.findIndex((i) => i.productId === productId && !i.note && !i.modifiers);
-      if (existing >= 0) {
-        const next = [...prev];
-        next[existing] = { ...next[existing], qty: next[existing].qty + 1 };
-        return next;
-      }
-      return [...prev, { productId: product.id, name: product.name, price, qty: 1 }];
-    });
-  };
+ const setOrderType = (type: OrderType) => {
+  console.log('🔄 Changing order type to:', type);
+  
+  // ✅ إذا لم يكن هناك طلب نشط، أنشئ طلباً جديداً
+  if (!currentOrderId) {
+    console.log('📝 No active order, creating new one...');
+    const order: ActiveOrder = {
+      id: uid('active'),
+      type,
+      items: [],
+      discount: 0,
+      tagIds: [],
+      status: 'open',
+      createdAt: new Date().toISOString(),
+    };
+    update((prev) => ({ ...prev, activeOrders: [...prev.activeOrders, order] }));
+    setCurrentOrderId(order.id);
+    setActiveCategoryId(settings.categories[0]?.id ?? '');
+    return;
+  }
+  
+  // ✅ إذا كان هناك طلب نشط، حدّث نوعه
+  console.log('✅ Updating existing order type to:', type);
+  update((prev) => ({
+    ...prev,
+    activeOrders: prev.activeOrders.map((o) =>
+      o.id === currentOrderId ? { ...o, type } : o
+    ),
+  }));
+};
 
   const changeQty = (index: number, delta: number) => {
     updateCart((prev) => {
