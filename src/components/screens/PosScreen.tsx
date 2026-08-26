@@ -289,20 +289,43 @@ export function PosScreen() {
   };
 
   // =============================================
-  // ✅ دالة طباعة الفاتورة (معدلة بالكامل)
+  // ✅ دالة طباعة الفاتورة (معدلة بالكامل مع إعدادات الفاتورة وقص تلقائي)
   // =============================================
   const handlePrintReceipt = () => {
     if (!lastOrder) return;
     setPrintError('');
 
     try {
-      // حساب طول الورق بناءً على عدد الأصناف
+      // جلب إعدادات الفاتورة من النظام
+      const {
+        restaurantName = 'مطعم أسايل',
+        slogan = '',
+        address = '',
+        phone = '',
+        taxId = '',
+        footer = 'شكراً لزيارتكم 🤍',
+        currency = 'ر.س',
+        showCashier = true,
+        showTimestamp = true,
+        showOrderType = true,
+      } = settings;
+
+      // حساب طول الورق بدقة حسب عدد الأصناف
       const itemsCount = lastOrder.items.length;
-      const lineHeight = 24;
-      const headerHeight = 170;
-      const footerHeight = 120;
+      const lineHeight = 24; // ارتفاع كل صنف
+      const headerHeight = 200; // ارتفاع الرأس
+      const footerHeight = 140; // ارتفاع التذييل
       const totalHeight = headerHeight + (itemsCount * lineHeight) + footerHeight;
-      const paperHeight = Math.max(350, totalHeight);
+      const paperHeight = Math.max(400, totalHeight); // أقل ارتفاع 400px
+
+      // تنسيق نوع الطلب
+      const orderTypeMap = {
+        'dine-in': 'صالة',
+        'takeaway': 'سفري',
+        'delivery': 'توصيل',
+        'talabat': 'طلبات',
+      };
+      const orderTypeLabel = orderTypeMap[lastOrder.type as keyof typeof orderTypeMap] || lastOrder.type;
 
       const receiptHTML = `
         <!DOCTYPE html>
@@ -345,7 +368,7 @@ export function PosScreen() {
               .header {
                 text-align: center;
                 border-bottom: 1px dashed #000;
-                padding-bottom: 4px;
+                padding-bottom: 6px;
                 margin-bottom: 6px;
               }
               .title {
@@ -353,9 +376,29 @@ export function PosScreen() {
                 font-weight: bold;
                 margin: 0;
               }
+              .slogan {
+                font-size: 11px;
+                color: #555;
+                margin: 2px 0;
+              }
               .sub {
                 font-size: 10px;
                 margin: 1px 0;
+              }
+              .address {
+                font-size: 9px;
+                color: #666;
+                margin: 1px 0;
+              }
+              .tax-id {
+                font-size: 9px;
+                color: #666;
+                margin-top: 2px;
+              }
+              .phone {
+                font-size: 9px;
+                color: #666;
+                margin-top: 2px;
               }
               table {
                 width: 100%;
@@ -369,12 +412,19 @@ export function PosScreen() {
               .right { text-align: right; }
               .center { text-align: center; }
               .left { text-align: left; }
-              .total {
+              .divider {
                 border-top: 1px dashed #000;
+                margin: 4px 0;
+              }
+              .total {
                 margin-top: 4px;
                 padding-top: 4px;
                 font-weight: bold;
                 font-size: 13px;
+              }
+              .total-line {
+                display: flex;
+                justify-content: space-between;
               }
               .footer {
                 text-align: center;
@@ -382,17 +432,32 @@ export function PosScreen() {
                 margin-top: 6px;
                 padding-top: 6px;
                 font-size: 10px;
+                color: #555;
               }
-              .print-only { display: block; }
+              .info-line {
+                display: flex;
+                justify-content: space-between;
+                font-size: 10px;
+                margin: 1px 0;
+              }
+              .left-text { text-align: left; }
+              .right-text { text-align: right; }
             </style>
           </head>
           <body>
             <div class="receipt-content">
               <div>
                 <div class="header">
-                  <div class="title">🧾 مطعم أسايل</div>
+                  <div class="title">🧾 ${restaurantName}</div>
+                  ${slogan ? `<div class="slogan">${slogan}</div>` : ''}
+                  ${address ? `<div class="address">${address}</div>` : ''}
+                  ${phone ? `<div class="phone">📞 ${phone}</div>` : ''}
+                  ${taxId ? `<div class="tax-id">الرقم الضريبي: ${taxId}</div>` : ''}
+                  <div class="divider"></div>
                   <div class="sub">رقم الفاتورة: #${lastOrder.number}</div>
-                  <div class="sub">${new Date(lastOrder.createdAt).toLocaleDateString('ar-EG')} - ${new Date(lastOrder.createdAt).toLocaleTimeString('ar-EG')}</div>
+                  ${showTimestamp ? `<div class="sub">${new Date(lastOrder.createdAt).toLocaleDateString('ar-EG')} - ${new Date(lastOrder.createdAt).toLocaleTimeString('ar-EG')}</div>` : ''}
+                  ${showOrderType ? `<div class="sub">نوع الطلب: ${orderTypeLabel}</div>` : ''}
+                  ${showCashier && lastOrder.cashierName ? `<div class="sub">الكاشير: ${lastOrder.cashierName}</div>` : ''}
                 </div>
 
                 <table>
@@ -405,29 +470,65 @@ export function PosScreen() {
                     <tr>
                       <td class="right">${item.name}</td>
                       <td class="center">${item.qty}</td>
-                      <td class="left">${(item.price * item.qty).toFixed(2)} ر.س</td>
+                      <td class="left">${(item.price * item.qty).toFixed(2)} ${currency}</td>
                     </tr>
                   `).join('')}
                 </table>
 
+                <div class="divider"></div>
+
                 <div class="total">
-                  <div>المجموع: ${lastOrder.total.toFixed(2)} ر.س</div>
+                  <div class="total-line">
+                    <span>المجموع الفرعي</span>
+                    <span>${lastOrder.subtotal.toFixed(2)} ${currency}</span>
+                  </div>
+                  ${lastOrder.discount > 0 ? `
+                    <div class="total-line" style="color:red;">
+                      <span>الخصم</span>
+                      <span>-${lastOrder.discount.toFixed(2)} ${currency}</span>
+                    </div>
+                  ` : ''}
+                  ${lastOrder.deliveryFee > 0 ? `
+                    <div class="total-line">
+                      <span>رسوم التوصيل</span>
+                      <span>${lastOrder.deliveryFee.toFixed(2)} ${currency}</span>
+                    </div>
+                  ` : ''}
+                  ${lastOrder.tax > 0 ? `
+                    <div class="total-line">
+                      <span>الضريبة (${settings.financials?.vatValue || 15}%)</span>
+                      <span>${lastOrder.tax.toFixed(2)} ${currency}</span>
+                    </div>
+                  ` : ''}
+                  <div class="divider"></div>
+                  <div class="total-line" style="font-size:14px;">
+                    <span><strong>المجموع النهائي</strong></span>
+                    <span><strong>${lastOrder.total.toFixed(2)} ${currency}</strong></span>
+                  </div>
+                  ${lastOrder.paymentMethod ? `
+                    <div class="total-line" style="font-size:10px;color:#666;margin-top:2px;">
+                      <span>طريقة الدفع</span>
+                      <span>${lastOrder.paymentMethod === 'cash' ? 'نقدي' : 'بطاقة'}</span>
+                    </div>
+                  ` : ''}
                 </div>
               </div>
 
-              <div class="footer">
-                شكراً لزيارتكم 🤍
+              <div>
+                <div class="footer">
+                  ${footer}
+                </div>
               </div>
-            </div>
 
-            <script>
-              window.onload = function() {
-                window.print();
-                setTimeout(function() {
-                  window.close();
-                }, 500);
-              };
-            </script>
+              <script>
+                window.onload = function() {
+                  window.print();
+                  setTimeout(function() {
+                    window.close();
+                  }, 500);
+                };
+              </script>
+            </div>
           </body>
         </html>
       `;
@@ -447,7 +548,7 @@ export function PosScreen() {
   };
 
   // =============================================
-  // ✅ دالة طباعة المطبخ (معدلة بالكامل)
+  // ✅ دالة طباعة المطبخ (معدلة بالكامل مع قص تلقائي)
   // =============================================
   const handlePrintKitchen = () => {
     setKitchenError('');
@@ -463,19 +564,20 @@ export function PosScreen() {
   };
 
   // =============================================
-  // ✅ دالة تأكيد طباعة المطبخ (معدلة بالكامل)
+  // ✅ دالة تأكيد طباعة المطبخ (معدلة بالكامل مع قص تلقائي)
   // =============================================
   const handleKitchenPrintConfirm = () => {
     if (!kitchenPreviewOrder) return;
     setKitchenError('');
 
     try {
+      // حساب طول الورق بدقة حسب عدد الأصناف
       const itemsCount = kitchenPreviewOrder.items.length;
       const lineHeight = 26;
       const headerHeight = 160;
       const footerHeight = 100;
       const totalHeight = headerHeight + (itemsCount * lineHeight) + footerHeight;
-      const paperHeight = Math.max(300, totalHeight);
+      const paperHeight = Math.max(350, totalHeight);
 
       const ticketHTML = `
         <!DOCTYPE html>
