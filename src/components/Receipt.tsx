@@ -25,6 +25,14 @@ export function Receipt({ order, onClose, onPrint, isPreview = false }: ReceiptP
   const branding = settings.branding;
   const itemCount = order.items.reduce((s, i) => s + i.qty, 0);
 
+  // ✅ حساب طول الورق تلقائياً حسب عدد الأصناف
+  const itemsCount = order.items.length;
+  const lineHeight = 24;
+  const headerHeight = 180;
+  const footerHeight = 120;
+  const totalHeight = headerHeight + (itemsCount * lineHeight) + footerHeight;
+  const paperHeight = Math.max(350, totalHeight);
+
   const handlePrint = () => {
     if (onPrint) {
       onPrint();
@@ -33,7 +41,6 @@ export function Receipt({ order, onClose, onPrint, isPreview = false }: ReceiptP
     }
   };
 
-  // ✅ دمج اسم المطعم من الإعدادات
   const restaurantName = r.restaurantName || branding.name || 'مطعم أسايل';
   const logo = branding.logo;
 
@@ -56,9 +63,12 @@ export function Receipt({ order, onClose, onPrint, isPreview = false }: ReceiptP
         <div
           className="print-area thermal-receipt bg-white font-mono text-gray-900"
           dir="rtl"
-          style={{ width: '80mm', padding: '4mm 3mm' }}
+          style={{ 
+            width: '80mm', 
+            height: `${paperHeight}px`,
+            padding: '2mm 3mm' 
+          }}
         >
-          {/* ✅ Header مع الشعار */}
           <div className="text-center mb-2">
             {logo && (
               <img 
@@ -89,7 +99,6 @@ export function Receipt({ order, onClose, onPrint, isPreview = false }: ReceiptP
             )}
           </div>
 
-          {/* Metadata */}
           <div className="border-t border-dashed border-gray-400 pt-1.5 mb-1.5 space-y-0.5 text-xs">
             {r.showCashierName && (
               <div className="flex justify-between">
@@ -111,7 +120,6 @@ export function Receipt({ order, onClose, onPrint, isPreview = false }: ReceiptP
             )}
           </div>
 
-          {/* Customer details */}
           {order.customer && (order.customer.name || order.customer.phone || order.customer.address) && (
             <div className="border-t border-dashed border-gray-400 pt-1.5 mb-1.5 space-y-0.5 text-xs">
               {order.customer.name && (
@@ -135,7 +143,6 @@ export function Receipt({ order, onClose, onPrint, isPreview = false }: ReceiptP
             </div>
           )}
 
-          {/* Prominent Order ID box */}
           <div className="border-2 border-gray-800 rounded my-2 text-center py-1.5">
             <p className="font-bold text-lg tracking-wide">Order# {order.number}</p>
             {isPreview && (
@@ -143,7 +150,6 @@ export function Receipt({ order, onClose, onPrint, isPreview = false }: ReceiptP
             )}
           </div>
 
-          {/* Timestamps */}
           {r.showTimestamps && (
             <div className="space-y-0.5 text-xs mb-1.5">
               <div className="flex justify-between">
@@ -157,7 +163,6 @@ export function Receipt({ order, onClose, onPrint, isPreview = false }: ReceiptP
             </div>
           )}
 
-          {/* Items table */}
           <div className="border-t border-dashed border-gray-400 pt-1.5 mb-1.5">
             <div className="flex font-bold text-xs pb-1 border-b border-gray-300">
               <span className="flex-1">Item</span>
@@ -186,7 +191,6 @@ export function Receipt({ order, onClose, onPrint, isPreview = false }: ReceiptP
             ))}
           </div>
 
-          {/* Totals */}
           <div className="space-y-0.5 text-xs mb-1.5">
             <div className="flex justify-between">
               <span>المجموع الفرعي / Subtotal</span>
@@ -222,7 +226,6 @@ export function Receipt({ order, onClose, onPrint, isPreview = false }: ReceiptP
             </div>
           </div>
 
-          {/* Payment */}
           <div className="border-t border-dashed border-gray-400 pt-1.5 mb-1.5 text-xs">
             <div className="flex justify-between">
               <span>طريقة الدفع / Payment:</span>
@@ -230,7 +233,6 @@ export function Receipt({ order, onClose, onPrint, isPreview = false }: ReceiptP
             </div>
           </div>
 
-          {/* Footer */}
           <div className="text-center border-t border-dashed border-gray-400 pt-2 mt-1">
             <p className="text-xs text-gray-500">Items: {itemCount}</p>
             {r.footer && (
