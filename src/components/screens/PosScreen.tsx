@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useSettings } from '@/context/SettingsContext';
-import type { CartItem, OrderType, PaymentMethod, Order, ActiveOrder, CustomerInfo } from '@/types';
+import type { CartItem, OrderType, PaymentMethod, Order, ActiveOrder } from '@/types';
 import { ORDER_TYPE_LABELS } from '@/types';
 import { uid, formatMoney, getProductPrice, addAuditEntry } from '@/utils/storage';
 import { browserPrint } from '@/utils/printer';
@@ -8,7 +8,7 @@ import {
   Printer, ChefHat, XCircle, Percent, StickyNote, Tag, MoreHorizontal,
   Search, Plus, Minus, Trash2, ShoppingCart, CreditCard,
   Bike, Store, Utensils, ShoppingBag, FilePlus, Layers,
-  AlertCircle, CheckCircle2, User,
+  AlertCircle, CheckCircle2,
 } from 'lucide-react';
 import { Modal, Button, Input, TextArea, Select } from '@/components/ui/Modal';
 import { PinPad } from '@/components/PinPad';
@@ -46,9 +46,6 @@ export function PosScreen() {
   const [refundAmount, setRefundAmount] = useState('');
   const [refundReason, setRefundReason] = useState('');
   const [kitchenPreviewOrder, setKitchenPreviewOrder] = useState<Order | null>(null);
-  const [customerName, setCustomerName] = useState('');
-  const [customerPhone, setCustomerPhone] = useState('');
-  const [customerAddress, setCustomerAddress] = useState('');
 
   const currentOrder = useMemo(
     () => settings.activeOrders.find((o) => o.id === currentOrderId) ?? null,
@@ -87,17 +84,6 @@ export function PosScreen() {
     [cart]
   );
   const total = Math.max(0, subtotal - orderDiscount + deliveryFee);
-
-  const estimatedVat = useMemo(
-    () => Math.round((subtotal - orderDiscount) * settings.financials.vatValue) / 100,
-    [subtotal, orderDiscount, settings.financials.vatValue]
-  );
-
-  const showCustomerForm = orderType === 'delivery' || orderType === 'talabat';
-
-  const currentCustomer: CustomerInfo | undefined = (customerName || customerPhone || customerAddress)
-    ? { name: customerName || undefined, phone: customerPhone || undefined, address: customerAddress || undefined }
-    : undefined;
 
   const updateCurrentOrder = (patch: Partial<ActiveOrder>) => {
     if (!currentOrderId) return;
@@ -259,7 +245,6 @@ export function PosScreen() {
       paymentMethod,
       cashierName: settings.cashierName || 'كاشير',
       closerName: closerName || undefined,
-      customer: currentCustomer,
       createdAt: new Date().toISOString(),
       tagIds: orderTagIds,
       status: 'completed',
@@ -280,497 +265,37 @@ export function PosScreen() {
     });
     setLastOrder(order);
     setCheckoutOpen(false);
-    // ✅ منع فتح مكون Receipt الذي يسبب مشكلة الطباعة
-    // setReceiptOpen(true);  // تم التعليق
-    setCustomerName('');
-    setCustomerPhone('');
-    setCustomerAddress('');
+    setReceiptOpen(true);
     const remaining = settings.activeOrders.filter((o) => o.id !== currentOrderId);
     setCurrentOrderId(remaining[0]?.id ?? '');
   };
 
-  // =============================================
-  // ✅ دالة طباعة الفاتورة (معدلة بالكامل - تدعم المعاينة والطباعة الرسمية مع الشعار)
-  // =============================================
   const handlePrintReceipt = () => {
-    setPrintError('');
-
-    // تحديد مصدر البيانات: lastOrder (بعد الدفع) أو cart (قبل الدفع)
-    const orderToPrint = lastOrder ?? (cart.length > 0 ? {
-      id: 'temp',
-      number: 0,
-      type: orderType,
-      tableLabel: orderType === 'dine-in' ? tableLabel : undefined,
-      deliveryZoneId: orderType === 'delivery' ? deliveryZoneId : undefined,
-      deliveryFee,
-      items: [...cart],
-      subtotal,
-      serviceCharge: 0,
-      tax: estimatedVat,
-      discount: orderDiscount,
-      total: total + estimatedVat,
-      paymentMethod: undefined,
-      cashierName: settings.cashierName || 'كاشير',
-      customer: currentCustomer,
-      createdAt: new Date().toISOString(),
-      tagIds: orderTagIds,
-      status: 'preview' as const,
-    } : null);
-
-    if (!orderToPrint) {
-      setPrintError('لا توجد منتجات في السلة للطباعة');
-      return;
-    }
-
-    try {
-      // ✅ جلب إعدادات الفاتورة من النظام (بما فيها الشعار)
-      const {
-        restaurantName = 'مطعم أسايل',
-        logo = '',           // ✅ صورة الشعار (URL أو Base64)
-        slogan = '',
-        address = '',
-        phone = '',
-        taxId = '',
-        footer = 'شكراً لزيارتكم 🤍',
-        currency = 'ر.س',
-        showCashier = true,
-        showTimestamp = true,
-        showOrderType = true,
-      } = settings;
-
-      // حساب طول الورق
-      const itemsCount = orderToPrint.items.length;
-      const lineHeight = 24;
-      const headerHeight = 220;  // زيادة الارتفاع قليلاً لاستيعاب الشعار
-      const footerHeight = 140;
-      const totalHeight = headerHeight + (itemsCount * lineHeight) + footerHeight;
-      const paperHeight = Math.max(450, totalHeight);
-
-      // تنسيق نوع الطلب
-      const orderTypeMap = {
-        'dine-in': 'صالة',
-        'takeaway': 'سفري',
-        'delivery': 'توصيل',
-        'talabat': 'طلبات',
-      };
-      const orderTypeLabel = orderTypeMap[orderToPrint.type as keyof typeof orderTypeMap] || orderToPrint.type;
-
-      // تحديد عنوان الفاتورة
-      const isPreview = orderToPrint.status === 'preview';
-      const receiptTitle = isPreview ? '🧾 معاينة الفاتورة' : '🧾 فاتورة';
-      const receiptSub = isPreview ? '(معاينة - غير مدفوعة)' : `رقم الفاتورة: #${orderToPrint.number}`;
-
-      const receiptHTML = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta charset="UTF-8">
-            <title>${isPreview ? 'معاينة الفاتورة' : `فاتورة #${orderToPrint.number}`}</title>
-            <style>
-              @page {
-                size: 80mm ${paperHeight}px;
-                margin: 0;
-                padding: 0;
-              }
-              * {
-                margin: 0;
-                padding: 0;
-                box-sizing: border-box;
-              }
-              body {
-                width: 80mm;
-                height: ${paperHeight}px;
-                margin: 0;
-                padding: 4mm 3mm;
-                font-family: 'Courier New', monospace;
-                font-size: 11px;
-                line-height: 1.4;
-                background: white;
-                color: black;
-                direction: rtl;
-                display: flex;
-                flex-direction: column;
-                justify-content: space-between;
-              }
-              .receipt-content {
-                flex: 1;
-                display: flex;
-                flex-direction: column;
-                justify-content: space-between;
-              }
-              .header {
-                text-align: center;
-                border-bottom: 1px dashed #000;
-                padding-bottom: 6px;
-                margin-bottom: 6px;
-              }
-              .logo {
-                max-width: 60mm;
-                height: auto;
-                margin: 0 auto 4px auto;
-                display: block;
-              }
-              .title {
-                font-size: 16px;
-                font-weight: bold;
-                margin: 0;
-              }
-              .preview-badge {
-                font-size: 11px;
-                color: #e67e22;
-                font-weight: bold;
-                margin: 2px 0;
-              }
-              .slogan {
-                font-size: 11px;
-                color: #555;
-                margin: 2px 0;
-              }
-              .sub {
-                font-size: 10px;
-                margin: 1px 0;
-              }
-              .address {
-                font-size: 9px;
-                color: #666;
-                margin: 1px 0;
-              }
-              .tax-id {
-                font-size: 9px;
-                color: #666;
-                margin-top: 2px;
-              }
-              .phone {
-                font-size: 9px;
-                color: #666;
-                margin-top: 2px;
-              }
-              table {
-                width: 100%;
-                border-collapse: collapse;
-                margin: 4px 0;
-              }
-              td {
-                padding: 2px 0;
-                font-size: 11px;
-              }
-              .right { text-align: right; }
-              .center { text-align: center; }
-              .left { text-align: left; }
-              .divider {
-                border-top: 1px dashed #000;
-                margin: 4px 0;
-              }
-              .total {
-                margin-top: 4px;
-                padding-top: 4px;
-                font-weight: bold;
-                font-size: 13px;
-              }
-              .total-line {
-                display: flex;
-                justify-content: space-between;
-              }
-              .footer {
-                text-align: center;
-                border-top: 1px dashed #000;
-                margin-top: 6px;
-                padding-top: 6px;
-                font-size: 10px;
-                color: #555;
-              }
-              .watermark {
-                position: fixed;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%) rotate(-30deg);
-                font-size: 30px;
-                color: rgba(255, 0, 0, 0.08);
-                font-weight: bold;
-                pointer-events: none;
-                z-index: -1;
-              }
-              .payment-method {
-                font-size: 10px;
-                color: #666;
-                margin-top: 2px;
-              }
-            </style>
-          </head>
-          <body>
-            ${isPreview ? '<div class="watermark">معاينة</div>' : ''}
-            <div class="receipt-content">
-              <div>
-                <div class="header">
-                  ${logo ? `<img src="${logo}" alt="شعار المطعم" class="logo" />` : ''}
-                  <div class="title">${receiptTitle}</div>
-                  ${isPreview ? '<div class="preview-badge">⚠️ معاينة - غير مدفوعة</div>' : ''}
-                  ${slogan ? `<div class="slogan">${slogan}</div>` : ''}
-                  ${address ? `<div class="address">📍 ${address}</div>` : ''}
-                  ${phone ? `<div class="phone">📞 ${phone}</div>` : ''}
-                  ${taxId ? `<div class="tax-id">الرقم الضريبي: ${taxId}</div>` : ''}
-                  <div class="divider"></div>
-                  <div class="sub">${receiptSub}</div>
-                  ${showTimestamp ? `<div class="sub">${new Date(orderToPrint.createdAt).toLocaleDateString('ar-EG')} - ${new Date(orderToPrint.createdAt).toLocaleTimeString('ar-EG')}</div>` : ''}
-                  ${showOrderType ? `<div class="sub">نوع الطلب: ${orderTypeLabel}</div>` : ''}
-                  ${showCashier && orderToPrint.cashierName ? `<div class="sub">الكاشير: ${orderToPrint.cashierName}</div>` : ''}
-                </div>
-
-                <table>
-                  <tr>
-                    <td class="right"><strong>المنتج</strong></td>
-                    <td class="center"><strong>الكمية</strong></td>
-                    <td class="left"><strong>السعر</strong></td>
-                  </tr>
-                  ${orderToPrint.items.map(item => `
-                    <tr>
-                      <td class="right">${item.name}</td>
-                      <td class="center">${item.qty}</td>
-                      <td class="left">${(item.price * item.qty).toFixed(2)} ${currency}</td>
-                    </tr>
-                  `).join('')}
-                </table>
-
-                <div class="divider"></div>
-
-                <div class="total">
-                  <div class="total-line">
-                    <span>المجموع الفرعي</span>
-                    <span>${orderToPrint.subtotal.toFixed(2)} ${currency}</span>
-                  </div>
-                  ${orderToPrint.discount > 0 ? `
-                    <div class="total-line" style="color:red;">
-                      <span>الخصم</span>
-                      <span>-${orderToPrint.discount.toFixed(2)} ${currency}</span>
-                    </div>
-                  ` : ''}
-                  ${orderToPrint.deliveryFee > 0 ? `
-                    <div class="total-line">
-                      <span>رسوم التوصيل</span>
-                      <span>${orderToPrint.deliveryFee.toFixed(2)} ${currency}</span>
-                    </div>
-                  ` : ''}
-                  ${orderToPrint.tax > 0 ? `
-                    <div class="total-line">
-                      <span>الضريبة (${settings.financials?.vatValue || 15}%)</span>
-                      <span>${orderToPrint.tax.toFixed(2)} ${currency}</span>
-                    </div>
-                  ` : ''}
-                  <div class="divider"></div>
-                  <div class="total-line" style="font-size:14px;">
-                    <span><strong>المجموع النهائي</strong></span>
-                    <span><strong>${orderToPrint.total.toFixed(2)} ${currency}</strong></span>
-                  </div>
-                  ${orderToPrint.paymentMethod ? `
-                    <div class="total-line payment-method">
-                      <span>طريقة الدفع</span>
-                      <span>${orderToPrint.paymentMethod === 'cash' ? 'نقدي' : 'بطاقة'}</span>
-                    </div>
-                  ` : ''}
-                  ${isPreview ? `
-                    <div class="total-line" style="font-size:10px;color:#e67e22;margin-top:4px;">
-                      <span>⚠️ هذه معاينة فقط</span>
-                      <span>غير مدفوعة</span>
-                    </div>
-                  ` : ''}
-                </div>
-              </div>
-
-              <div>
-                <div class="footer">
-                  ${footer}
-                </div>
-              </div>
-
-              <script>
-                window.onload = function() {
-                  window.print();
-                  setTimeout(function() {
-                    window.close();
-                  }, 500);
-                };
-              </script>
-            </div>
-          </body>
-        </html>
-      `;
-
-      const printWindow = window.open('', '_blank', 'width=400,height=600,menubar=no,toolbar=no,location=no,status=no');
-      if (printWindow) {
-        printWindow.document.write(receiptHTML);
-        printWindow.document.close();
-        printWindow.focus();
-      } else {
-        setPrintError('الرجاء السماح للنوافذ المنبثقة');
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setPrintError(`فشل الطباعة: ${msg}`);
-    }
+    if (!lastOrder) return;
+    window.print();
   };
 
-  // =============================================
-  // ✅ دالة طباعة المطبخ (معدلة بالكامل)
-  // =============================================
   const handlePrintKitchen = () => {
-    setKitchenError('');
     const orderToPrint = lastOrder ?? (cart.length > 0 ? {
       id: 'temp', number: 0, type: orderType, tableLabel, deliveryZoneId, deliveryFee,
       items: cart, subtotal, serviceCharge: 0, tax: 0, discount: orderDiscount, total,
       paymentMethod: 'cash' as PaymentMethod, cashierName: settings.cashierName || 'كاشير',
-      customer: currentCustomer,
       createdAt: new Date().toISOString(), tagIds: orderTagIds, status: 'open' as const,
     } : null);
     if (!orderToPrint) return;
     setKitchenPreviewOrder(orderToPrint);
   };
 
-  // =============================================
-  // ✅ دالة تأكيد طباعة المطبخ (معدلة بالكامل)
-  // =============================================
   const handleKitchenPrintConfirm = () => {
-    if (!kitchenPreviewOrder) return;
-    setKitchenError('');
-
-    try {
-      const itemsCount = kitchenPreviewOrder.items.length;
-      const lineHeight = 26;
-      const headerHeight = 160;
-      const footerHeight = 100;
-      const totalHeight = headerHeight + (itemsCount * lineHeight) + footerHeight;
-      const paperHeight = Math.max(350, totalHeight);
-
-      const ticketHTML = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta charset="UTF-8">
-            <title>تذكرة مطبخ #${kitchenPreviewOrder.number}</title>
-            <style>
-              @page {
-                size: 80mm ${paperHeight}px;
-                margin: 0;
-                padding: 0;
-              }
-              * {
-                margin: 0;
-                padding: 0;
-                box-sizing: border-box;
-              }
-              body {
-                width: 80mm;
-                height: ${paperHeight}px;
-                margin: 0;
-                padding: 4mm 3mm;
-                font-family: 'Courier New', monospace;
-                font-size: 13px;
-                line-height: 1.5;
-                background: white;
-                direction: rtl;
-                display: flex;
-                flex-direction: column;
-                justify-content: space-between;
-              }
-              .ticket-content {
-                flex: 1;
-                display: flex;
-                flex-direction: column;
-                justify-content: space-between;
-              }
-              .header {
-                text-align: center;
-                border-bottom: 2px solid #000;
-                padding-bottom: 6px;
-                margin-bottom: 8px;
-              }
-              .title {
-                font-size: 18px;
-                font-weight: bold;
-                margin: 0;
-              }
-              .sub {
-                font-size: 12px;
-                margin: 2px 0;
-              }
-              table {
-                width: 100%;
-                border-collapse: collapse;
-                margin: 4px 0;
-              }
-              td {
-                padding: 4px 0;
-                border-bottom: 1px dotted #ccc;
-                font-size: 13px;
-              }
-              .right { text-align: right; }
-              .center { text-align: center; }
-              .footer {
-                border-top: 2px solid #000;
-                margin-top: 8px;
-                padding-top: 8px;
-                text-align: center;
-                font-size: 12px;
-              }
-              .print-only { display: block; }
-            </style>
-          </head>
-          <body>
-            <div class="ticket-content">
-              <div>
-                <div class="header">
-                  <div class="title">🍽️ تذكرة مطبخ</div>
-                  <div class="sub">طلب #${kitchenPreviewOrder.number}</div>
-                  <div class="sub">${new Date(kitchenPreviewOrder.createdAt).toLocaleTimeString('ar-EG')}</div>
-                </div>
-
-                <table>
-                  <tr>
-                    <td class="right"><strong>المنتج</strong></td>
-                    <td class="center"><strong>الكمية</strong></td>
-                  </tr>
-                  ${kitchenPreviewOrder.items.map(item => `
-                    <tr>
-                      <td class="right">${item.name}</td>
-                      <td class="center">${item.qty}</td>
-                    </tr>
-                  `).join('')}
-                </table>
-              </div>
-
-              <div class="footer">
-                وقت التجهيز: 15 دقيقة
-              </div>
-            </div>
-
-            <script>
-              window.onload = function() {
-                window.print();
-                setTimeout(function() {
-                  window.close();
-                }, 500);
-              };
-            </script>
-          </body>
-        </html>
-      `;
-
-      const printWindow = window.open('', '_blank', 'width=400,height=600,menubar=no,toolbar=no,location=no,status=no');
-      if (printWindow) {
-        printWindow.document.write(ticketHTML);
-        printWindow.document.close();
-        printWindow.focus();
-
-        if (currentOrderId) updateCurrentOrder({ status: 'sent' });
-        setPrintSuccess(true);
-        setTimeout(() => setPrintSuccess(false), 3000);
-        setKitchenPreviewOrder(null);
-      } else {
-        setKitchenError('الرجاء السماح للنوافذ المنبثقة');
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setKitchenError(`فشل طباعة المطبخ: ${msg}`);
+    const result = browserPrint();
+    if (!result.success) {
+      setKitchenError(result.error ?? 'فشل طباعة المطبخ');
+    } else {
+      if (currentOrderId) updateCurrentOrder({ status: 'sent' });
+      setPrintSuccess(true);
+      setTimeout(() => setPrintSuccess(false), 3000);
     }
+    setKitchenPreviewOrder(null);
   };
 
   const processRefund = () => {
@@ -819,7 +344,7 @@ export function PosScreen() {
               label={`الطلبات النشطة (${settings.activeOrders.length})`}
               onClick={() => setOrdersListOpen(true)}
             />
-            <TopButton icon={Printer} label="طباعة" onClick={() => (lastOrder || cart.length > 0) && handlePrintReceipt()} />
+            <TopButton icon={Printer} label="طباعة" onClick={() => lastOrder && setReceiptOpen(true)} />
             <TopButton icon={ChefHat} label="مطبخ" onClick={handlePrintKitchen} />
             <TopButton icon={XCircle} label="إلغاء" variant="danger" onClick={() => cart.length > 0 ? setConfirmVoidOpen(true) : voidOrder()} disabled={!currentOrderId} />
             <TopButton icon={Percent} label="خصم" onClick={() => { setDiscountValue(String(orderDiscount || '')); setDiscountModalOpen(true); }} disabled={!currentOrderId} />
@@ -1014,58 +539,26 @@ export function PosScreen() {
           )}
         </div>
 
-        {showCustomerForm && currentOrderId && (
-          <div className="border-t border-gray-100 px-4 py-3 space-y-2 bg-orange-50/50">
-            <p className="text-xs font-bold text-orange-700 flex items-center gap-1">
-              <User size={14} className="inline" />
-              بيانات العميل
-            </p>
-            <Input
-              placeholder="اسم العميل"
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-              className="text-sm"
-            />
-            <Input
-              type="tel"
-              placeholder="رقم الهاتف"
-              value={customerPhone}
-              onChange={(e) => setCustomerPhone(e.target.value)}
-              className="text-sm"
-            />
-            <Input
-              placeholder="المنطقة / العنوان"
-              value={customerAddress}
-              onChange={(e) => setCustomerAddress(e.target.value)}
-              className="text-sm"
-            />
-          </div>
-        )}
-
         <div className="border-t border-gray-100 p-4 space-y-2">
           <div className="flex justify-between text-sm text-gray-500">
-            <span>المجموع الفرعي / Subtotal</span>
+            <span>المجموع الفرعي</span>
             <span className="font-semibold">{formatMoney(subtotal)}</span>
           </div>
           {orderDiscount > 0 && (
             <div className="flex justify-between text-sm text-red-500">
-              <span>الخصم / Discount</span>
+              <span>الخصم</span>
               <span className="font-semibold">-{formatMoney(orderDiscount)}</span>
             </div>
           )}
           {deliveryFee > 0 && (
             <div className="flex justify-between text-sm text-gray-500">
-              <span>رسوم التوصيل / Delivery</span>
+              <span>رسوم التوصيل</span>
               <span className="font-semibold">{formatMoney(deliveryFee)}</span>
             </div>
           )}
-          <div className="flex justify-between text-sm text-gray-500">
-            <span>ضريبة القيمة المضافة / VAT ({settings.financials.vatValue}%)</span>
-            <span className="font-semibold">{formatMoney(estimatedVat)}</span>
-          </div>
           <div className="flex justify-between items-center pt-2 border-t border-gray-100">
-            <span className="text-base font-bold text-gray-800">المجموع النهائي / Total</span>
-            <span className="text-2xl font-bold text-blue-600">{formatMoney(total + estimatedVat)}</span>
+            <span className="text-base font-bold text-gray-800">الإجمالي</span>
+            <span className="text-2xl font-bold text-blue-600">{formatMoney(total)}</span>
           </div>
           <Button size="lg" className="w-full" disabled={cart.length === 0} onClick={() => setCheckoutOpen(true)}>
             <CreditCard size={20} className="inline ml-2" />
