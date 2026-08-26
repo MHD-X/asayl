@@ -55,6 +55,7 @@ export const defaultSettings: Settings = {
   ],
   auditLog: [],
   activeOrders: [],
+  orderCounter: 0, // ✅ عداد الطلبات التلقائي
 };
 
 export function loadSettings(): Settings {
@@ -79,6 +80,7 @@ export function loadSettings(): Settings {
       auditLog: parsed.auditLog ?? [],
       activeOrders: parsed.activeOrders ?? [],
       modifierGroups: parsed.modifierGroups ?? [],
+      orderCounter: parsed.orderCounter ?? 0, // ✅ قراءة العداد
     };
     return merged;
   } catch {
