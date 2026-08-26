@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useSettings } from '@/context/SettingsContext';
-import type { CartItem, OrderType, PaymentMethod, Order, ActiveOrder } from '@/types';
+import type { CartItem, OrderType, PaymentMethod, Order, ActiveOrder, CustomerInfo } from '@/types';
 import { ORDER_TYPE_LABELS } from '@/types';
 import { uid, formatMoney, getProductPrice, addAuditEntry } from '@/utils/storage';
 import { browserPrint } from '@/utils/printer';
@@ -46,6 +46,9 @@ export function PosScreen() {
   const [refundAmount, setRefundAmount] = useState('');
   const [refundReason, setRefundReason] = useState('');
   const [kitchenPreviewOrder, setKitchenPreviewOrder] = useState<Order | null>(null);
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerAddress, setCustomerAddress] = useState('');
 
   const currentOrder = useMemo(
     () => settings.activeOrders.find((o) => o.id === currentOrderId) ?? null,
@@ -90,6 +93,10 @@ export function PosScreen() {
     () => Math.round((subtotal - orderDiscount) * (settings.financials?.vatValue || 15)) / 100,
     [subtotal, orderDiscount, settings.financials?.vatValue]
   );
+
+  const currentCustomer: CustomerInfo | undefined = (customerName || customerPhone || customerAddress)
+    ? { name: customerName || undefined, phone: customerPhone || undefined, address: customerAddress || undefined }
+    : undefined;
 
   const updateCurrentOrder = (patch: Partial<ActiveOrder>) => {
     if (!currentOrderId) return;
@@ -234,6 +241,11 @@ export function PosScreen() {
   const completeOrder = (paymentMethod: PaymentMethod, serviceCharge: number, tax: number, closerName: string) => {
     if (cart.length === 0) return;
 
+    // ✅ تعريف currentCustomer داخل الدالة (كإجراء احتياطي)
+    const orderCustomer: CustomerInfo | undefined = (customerName || customerPhone || customerAddress)
+      ? { name: customerName || undefined, phone: customerPhone || undefined, address: customerAddress || undefined }
+      : undefined;
+
     // ✅ الحصول على الرقم التالي من العداد العام
     const nextOrderNumber = (settings.orderCounter || 0) + 1;
 
@@ -254,7 +266,7 @@ export function PosScreen() {
       paymentMethod,
       cashierName: settings.cashierName || 'كاشير',
       closerName: closerName || undefined,
-      customer: currentCustomer,
+      customer: orderCustomer,
       createdAt: new Date().toISOString(),
       tagIds: orderTagIds,
       status: 'completed',
@@ -584,6 +596,34 @@ export function PosScreen() {
             </div>
           )}
         </div>
+
+        {showCustomerForm && currentOrderId && (
+          <div className="border-t border-gray-100 px-4 py-3 space-y-2 bg-orange-50/50">
+            <p className="text-xs font-bold text-orange-700 flex items-center gap-1">
+              <User size={14} className="inline" />
+              بيانات العميل
+            </p>
+            <Input
+              placeholder="اسم العميل"
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+              className="text-sm"
+            />
+            <Input
+              type="tel"
+              placeholder="رقم الهاتف"
+              value={customerPhone}
+              onChange={(e) => setCustomerPhone(e.target.value)}
+              className="text-sm"
+            />
+            <Input
+              placeholder="المنطقة / العنوان"
+              value={customerAddress}
+              onChange={(e) => setCustomerAddress(e.target.value)}
+              className="text-sm"
+            />
+          </div>
+        )}
 
         <div className="border-t border-gray-100 p-4 space-y-2">
           <div className="flex justify-between text-sm text-gray-500">
