@@ -85,6 +85,12 @@ export function PosScreen() {
   );
   const total = Math.max(0, subtotal - orderDiscount + deliveryFee);
 
+  // ✅ حساب الضريبة المقدرة للمعاينة
+  const estimatedVat = useMemo(
+    () => Math.round((subtotal - orderDiscount) * (settings.financials?.vatValue || 15)) / 100,
+    [subtotal, orderDiscount, settings.financials?.vatValue]
+  );
+
   const updateCurrentOrder = (patch: Partial<ActiveOrder>) => {
     if (!currentOrderId) return;
     update((prev) => ({
@@ -224,10 +230,15 @@ export function PosScreen() {
     setPinAction(null);
   };
 
+  // ✅ دالة completeOrder المعدلة مع الترقيم التلقائي
   const completeOrder = (paymentMethod: PaymentMethod, serviceCharge: number, tax: number, closerName: string) => {
     if (cart.length === 0) return;
-    const shiftOrders = settings.shifts.find((s) => s.id === settings.currentShiftId)?.orders ?? [];
-    const orderNumber = shiftOrders.length + 1;
+
+    // ✅ الحصول على رقم الطلب التالي داخل الوردية
+    const currentShift = settings.shifts.find((s) => s.id === settings.currentShiftId);
+    const shiftOrderCount = currentShift?.orders?.length ?? 0;
+    const orderNumber = shiftOrderCount + 1;  // يبدأ من 1
+
     const finalTotal = Math.max(0, subtotal - orderDiscount + deliveryFee + serviceCharge + tax);
     const order: Order = {
       id: uid('order'),
@@ -245,10 +256,12 @@ export function PosScreen() {
       paymentMethod,
       cashierName: settings.cashierName || 'كاشير',
       closerName: closerName || undefined,
+      customer: currentCustomer,
       createdAt: new Date().toISOString(),
       tagIds: orderTagIds,
       status: 'completed',
     };
+
     update((prev) => {
       const orders = [...prev.orders, order];
       const shifts = prev.shifts.map((s) =>
@@ -263,6 +276,7 @@ export function PosScreen() {
         activeOrders: prev.activeOrders.filter((o) => o.id !== currentOrderId),
       };
     });
+
     setLastOrder(order);
     setCheckoutOpen(false);
     setReceiptOpen(true);
@@ -344,7 +358,40 @@ export function PosScreen() {
               label={`الطلبات النشطة (${settings.activeOrders.length})`}
               onClick={() => setOrdersListOpen(true)}
             />
-            <TopButton icon={Printer} label="طباعة" onClick={() => lastOrder && setReceiptOpen(true)} />
+            {/* ✅ زر الطباعة المعدل */}
+            <TopButton 
+              icon={Printer} 
+              label="طباعة" 
+              onClick={() => {
+                if (lastOrder) {
+                  setReceiptOpen(true);
+                } else if (cart.length > 0) {
+                  const tempOrder: any = {
+                    id: 'temp',
+                    number: 0,
+                    type: orderType,
+                    tableLabel: orderType === 'dine-in' ? tableLabel : undefined,
+                    deliveryZoneId: orderType === 'delivery' ? deliveryZoneId : undefined,
+                    deliveryFee,
+                    items: [...cart],
+                    subtotal,
+                    serviceCharge: 0,
+                    tax: estimatedVat,
+                    discount: orderDiscount,
+                    total: total + estimatedVat,
+                    paymentMethod: 'cash',
+                    cashierName: settings.cashierName || 'كاشير',
+                    createdAt: new Date().toISOString(),
+                    tagIds: orderTagIds,
+                    status: 'preview',
+                  };
+                  setLastOrder(tempOrder);
+                  setReceiptOpen(true);
+                } else {
+                  setPrintError('لا توجد منتجات للطباعة');
+                }
+              }} 
+            />
             <TopButton icon={ChefHat} label="مطبخ" onClick={handlePrintKitchen} />
             <TopButton icon={XCircle} label="إلغاء" variant="danger" onClick={() => cart.length > 0 ? setConfirmVoidOpen(true) : voidOrder()} disabled={!currentOrderId} />
             <TopButton icon={Percent} label="خصم" onClick={() => { setDiscountValue(String(orderDiscount || '')); setDiscountModalOpen(true); }} disabled={!currentOrderId} />
@@ -717,11 +764,13 @@ export function PosScreen() {
         />
       )}
 
+      {/* ✅ مكون Receipt المعدل مع isPreview */}
       {receiptOpen && lastOrder && (
         <Receipt
           order={lastOrder}
           onClose={() => setReceiptOpen(false)}
           onPrint={handlePrintReceipt}
+          isPreview={lastOrder.status === 'preview'}
         />
       )}
 
