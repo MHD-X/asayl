@@ -301,111 +301,95 @@ export function PosScreen() {
     setCurrentOrderId(remaining[0]?.id ?? '');
   };
 
-  // ✅ دالة الطباعة المباشرة
-  const handlePrintReceipt = () => {
-    if (!lastOrder) {
-      setPrintError('لا توجد فاتورة للطباعة');
-      return;
-    }
-
+  // ============================================
+  // ✅ دالة طباعة فاتورة العميل
+  // ============================================
+  const printReceiptHTML = (order: Order) => {
     const receiptSettings = settings.receiptSettings;
     const branding = settings.branding;
     const restaurantName = receiptSettings.restaurantName || branding.name || 'مطعم أسايل';
     const logo = branding.logo;
     const footer = receiptSettings.footer || 'شكراً لزيارتكم 🤍';
     const currency = receiptSettings.currency || 'ر.س';
+    const isPreview = order.status === 'preview';
 
-    // حساب ارتفاع الورق
-    const itemsCount = lastOrder.items.length;
-    const lineHeight = 24;
-    const headerHeight = 180;
-    const footerHeight = 120;
+    const itemsCount = order.items.length;
+    const lineHeight = 28;
+    const headerHeight = 220;
+    const footerHeight = 160;
     const totalHeight = headerHeight + (itemsCount * lineHeight) + footerHeight;
-    const paperHeight = Math.max(350, totalHeight);
+    const paperHeight = Math.max(450, totalHeight);
 
-    const printContent = `
+    // تنسيق طريقة الدفع
+    const paymentMethodLabels: Record<string, string> = {
+      cash: '💵 نقدي',
+      visa: '💳 فيزا',
+      'talabat-cash': '📱 كاش طلبات',
+      'talabat-visa': '📱 فيزا طلبات',
+      rappit: '🛵 رابيت',
+      'petrol-card': '⛽ بطاقة بنزين',
+    };
+
+    const paymentLabel = order.paymentMethod ? paymentMethodLabels[order.paymentMethod] || order.paymentMethod : '';
+
+    return `
       <!DOCTYPE html>
       <html>
         <head>
           <meta charset="UTF-8">
-          <title>فاتورة #${lastOrder.number}</title>
+          <title>فاتورة #${order.number}</title>
           <style>
-            @page { 
-              size: 80mm ${paperHeight}px; 
-              margin: 0; 
-              padding: 0; 
-            }
+            @page { size: 80mm ${paperHeight}px; margin: 0; padding: 0; }
             * { margin: 0; padding: 0; box-sizing: border-box; }
-            body { 
-              width: 80mm; 
+            body {
+              width: 80mm;
               height: ${paperHeight}px;
-              margin: 0; 
-              padding: 3mm;
+              margin: 0;
+              padding: 4mm 3mm;
               font-family: 'Courier New', monospace;
-              font-size: 11px;
-              line-height: 1.4;
+              font-size: 12px;
+              line-height: 1.5;
               direction: rtl;
               background: white;
               display: flex;
               flex-direction: column;
               justify-content: space-between;
             }
-            .header { 
-              text-align: center; 
-              border-bottom: 1px dashed #000; 
-              padding-bottom: 6px; 
-              margin-bottom: 6px;
-            }
-            .title { 
-              font-size: 16px; 
-              font-weight: bold; 
-            }
-            .sub { 
-              font-size: 10px; 
-              margin: 2px 0; 
-            }
-            .logo {
-              max-width: 60mm;
-              height: auto;
-              margin: 0 auto 4px auto;
-              display: block;
-            }
-            table { 
-              width: 100%; 
-              border-collapse: collapse; 
-              margin: 4px 0;
-            }
-            td { 
-              padding: 3px 0; 
-              font-size: 10px;
-            }
-            .th { 
-              font-weight: bold; 
-              border-bottom: 1px solid #000;
-            }
-            .total { 
-              border-top: 1px dashed #000; 
-              padding-top: 6px; 
-              font-weight: bold; 
-              font-size: 13px;
-              margin-top: 4px;
-            }
-            .footer { 
-              text-align: center; 
-              border-top: 1px dashed #000; 
-              padding-top: 6px; 
-              margin-top: 6px;
-              font-size: 10px; 
-            }
+            .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 8px; }
+            .title { font-size: 18px; font-weight: bold; }
+            .sub { font-size: 11px; margin: 2px 0; }
+            .slogan { font-size: 13px; color: #555; margin: 2px 0; letter-spacing: 2px; }
+            .logo { max-width: 55mm; height: auto; margin: 0 auto 4px auto; display: block; }
+            .check-info { border: 2px solid #000; border-radius: 4px; padding: 4px 8px; margin: 6px 0; text-align: center; }
+            .check-info .num { font-size: 20px; font-weight: bold; }
+            .info-line { display: flex; justify-content: space-between; font-size: 11px; padding: 2px 0; }
+            table { width: 100%; border-collapse: collapse; margin: 6px 0; }
+            td { padding: 4px 0; font-size: 12px; border-bottom: 1px dotted #ccc; }
+            .th { font-weight: bold; border-bottom: 2px solid #000; font-size: 13px; }
             .right { text-align: right; }
             .center { text-align: center; }
             .left { text-align: left; }
-            .preview-badge {
-              color: #e67e22;
+            .total-section { border-top: 2px solid #000; padding-top: 6px; margin-top: 4px; }
+            .total-line { display: flex; justify-content: space-between; padding: 2px 0; font-size: 12px; }
+            .total-line.bold { font-weight: bold; font-size: 16px; }
+            .total-line.vat { color: #2980b9; }
+            .total-line.service { color: #2c3e50; }
+            .total-line.discount { color: #e74c3c; }
+            .payment-box { 
+              text-align: center; 
+              margin: 6px 0; 
+              padding: 6px; 
+              background: #f8f9fa; 
+              border-radius: 4px; 
+              border: 1px solid #ddd;
+              font-size: 14px;
               font-weight: bold;
-              font-size: 11px;
-              margin: 4px 0;
             }
+            .footer { text-align: center; border-top: 2px solid #000; padding-top: 8px; margin-top: 8px; font-size: 11px; }
+            .preview-badge { color: #e67e22; font-weight: bold; font-size: 14px; margin: 4px 0; text-align: center; }
+            .customer-info { background: #f5f5f5; padding: 4px 8px; border-radius: 4px; margin: 4px 0; font-size: 11px; }
+            .address-info { font-size: 10px; color: #555; margin: 2px 0; }
+            .products-count { font-size: 11px; color: #666; text-align: center; margin: 4px 0; }
           </style>
         </head>
         <body>
@@ -413,34 +397,110 @@ export function PosScreen() {
             <div class="header">
               ${logo ? `<img src="${logo}" alt="شعار المطعم" class="logo" />` : ''}
               <div class="title">${restaurantName}</div>
-              ${lastOrder.status === 'preview' ? '<div class="preview-badge">⚠️ معاينة - غير مدفوعة</div>' : ''}
-              <div class="sub">رقم الفاتورة: #${lastOrder.number}</div>
-              <div class="sub">${new Date(lastOrder.createdAt).toLocaleDateString('ar-EG')} - ${new Date(lastOrder.createdAt).toLocaleTimeString('ar-EG')}</div>
-              ${lastOrder.cashierName ? `<div class="sub">الكاشير: ${lastOrder.cashierName}</div>` : ''}
+              <div class="slogan">${receiptSettings.subtitle || ''}</div>
+              ${isPreview ? '<div class="preview-badge">⚠️ معاينة - غير مدفوعة</div>' : ''}
             </div>
 
+            <div class="check-info">
+              <span class="num">Check</span>
+              <span class="num" style="margin-right:4px;">#${order.number}</span>
+            </div>
+
+            <div class="info-line">
+              <span>Printed At:</span>
+              <span>${new Date().toLocaleString('ar-EG')}</span>
+            </div>
+            ${order.type === 'delivery' ? `
+              <div class="info-line">
+                <span>Delivery Check#:</span>
+                <span>${order.number}</span>
+              </div>
+            ` : ''}
+            <div class="info-line">
+              <span>Check In:</span>
+              <span>${new Date(order.createdAt).toLocaleString('ar-EG')}</span>
+            </div>
+
+            <div class="info-line">
+              <span>Creator:</span>
+              <span>${order.cashierName || 'كاشير'}</span>
+            </div>
+
+            ${order.customer ? `
+              <div class="customer-info">
+                <div>Customer: ${order.customer.name || ''} ${order.customer.phone ? `Mobile: ${order.customer.phone}` : ''}</div>
+                ${order.customer.address ? `<div class="address-info">Address: ${order.customer.address}</div>` : ''}
+              </div>
+            ` : ''}
+
             <table>
-              <tr>
-                <td class="right"><strong>المنتج</strong></td>
-                <td class="center"><strong>الكمية</strong></td>
-                <td class="left"><strong>السعر</strong></td>
+              <tr class="th">
+                <td class="right">المنتج</td>
+                <td class="center">الكمية</td>
+                <td class="left">السعر</td>
               </tr>
-              ${lastOrder.items.map(item => `
+              ${order.items.map(item => `
                 <tr>
                   <td class="right">${item.name}</td>
                   <td class="center">${item.qty}</td>
                   <td class="left">${(item.price * item.qty).toFixed(2)} ${currency}</td>
                 </tr>
+                ${item.note ? `<tr><td colspan="3" style="color:#e67e22;font-size:11px;border-bottom:none;">📝 ${item.note}</td></tr>` : ''}
               `).join('')}
             </table>
 
-            <div class="total">
-              <div>المجموع الفرعي: ${lastOrder.subtotal.toFixed(2)} ${currency}</div>
-              ${lastOrder.discount > 0 ? `<div>الخصم: -${lastOrder.discount.toFixed(2)} ${currency}</div>` : ''}
-              ${lastOrder.tax > 0 ? `<div>الضريبة (${receiptSettings.vatPercent || 15}%): ${lastOrder.tax.toFixed(2)} ${currency}</div>` : ''}
-              <div style="font-size:14px;margin-top:4px;">الإجمالي: ${lastOrder.total.toFixed(2)} ${currency}</div>
-              ${lastOrder.paymentMethod ? `<div style="font-size:10px;margin-top:4px;">طريقة الدفع: ${lastOrder.paymentMethod === 'cash' ? 'نقدي' : 'بطاقة'}</div>` : ''}
+            <div class="total-section">
+              <div class="total-line">
+                <span>المجموع الفرعي</span>
+                <span>${order.subtotal.toFixed(2)} ${currency}</span>
+              </div>
+              ${order.discount > 0 ? `
+                <div class="total-line discount">
+                  <span>الخصم</span>
+                  <span>-${order.discount.toFixed(2)} ${currency}</span>
+                </div>
+              ` : ''}
+              ${order.deliveryFee > 0 ? `
+                <div class="total-line">
+                  <span>رسوم التوصيل</span>
+                  <span>${order.deliveryFee.toFixed(2)} ${currency}</span>
+                </div>
+              ` : ''}
+              ${order.serviceCharge > 0 ? `
+                <div class="total-line service">
+                  <span>رسوم الخدمة</span>
+                  <span>${order.serviceCharge.toFixed(2)} ${currency}</span>
+                </div>
+              ` : ''}
+              ${order.tax > 0 ? `
+                <div class="total-line vat">
+                  <span>الضريبة (${receiptSettings.vatPercent || 15}%)</span>
+                  <span>${order.tax.toFixed(2)} ${currency}</span>
+                </div>
+              ` : ''}
+              <div style="border-top:2px solid #000;margin:4px 0;padding-top:4px;">
+                <div class="total-line bold">
+                  <span>الإجمالي</span>
+                  <span>${order.total.toFixed(2)} ${currency}</span>
+                </div>
+              </div>
             </div>
+
+            ${paymentLabel ? `
+              <div class="payment-box">
+                طريقة الدفع: ${paymentLabel}
+              </div>
+            ` : ''}
+
+            <div class="products-count">
+              Products Count: ${order.items.reduce((sum, item) => sum + item.qty, 0)}
+            </div>
+
+            ${isPreview ? `
+              <div style="text-align:center;color:#e67e22;font-size:14px;font-weight:bold;margin-top:6px;">
+                ⚠️ هذه معاينة فقط - غير مدفوعة
+              </div>
+            ` : ''}
           </div>
 
           <div class="footer">
@@ -456,10 +516,107 @@ export function PosScreen() {
         </body>
       </html>
     `;
+  };
+
+  // ============================================
+  // ✅ دالة طباعة تذكرة المطبخ
+  // ============================================
+  const printKitchenTicket = (order: Order) => {
+    const ticketHTML = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>تذكرة مطبخ #${order.number}</title>
+          <style>
+            @page { size: 80mm auto; margin: 0; padding: 0; }
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body {
+              width: 80mm;
+              margin: 0;
+              padding: 3mm;
+              font-family: 'Courier New', monospace;
+              font-size: 13px;
+              line-height: 1.5;
+              direction: rtl;
+              background: white;
+            }
+            .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 6px; margin-bottom: 8px; }
+            .title { font-size: 20px; font-weight: bold; }
+            .sub { font-size: 12px; margin: 2px 0; }
+            table { width: 100%; border-collapse: collapse; margin: 4px 0; }
+            td { padding: 4px 0; border-bottom: 1px dotted #ccc; font-size: 13px; }
+            .right { text-align: right; }
+            .center { text-align: center; }
+            .footer { border-top: 2px solid #000; margin-top: 8px; padding-top: 8px; text-align: center; font-size: 12px; }
+            .note { color: #e67e22; font-size: 12px; margin: 4px 0; padding: 4px; border: 1px dashed #e67e22; border-radius: 4px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="title">🍽️ تذكرة مطبخ</div>
+            <div class="sub">طلب #${order.number}</div>
+            <div class="sub">${new Date(order.createdAt).toLocaleTimeString('ar-EG')}</div>
+            ${order.tableLabel ? `<div class="sub">طاولة: ${order.tableLabel}</div>` : ''}
+            ${order.type === 'delivery' ? `<div class="sub">📍 توصيل</div>` : ''}
+          </div>
+
+          <table>
+            <tr>
+              <td class="right"><strong>المنتج</strong></td>
+              <td class="center"><strong>الكمية</strong></td>
+            </tr>
+            ${order.items.map(item => `
+              <tr>
+                <td class="right">${item.name}</td>
+                <td class="center">${item.qty}</td>
+              </tr>
+              ${item.note ? `<tr><td colspan="2" class="note">📝 ${item.note}</td></tr>` : ''}
+            `).join('')}
+          </table>
+
+          <div class="footer">
+            ${order.deliveryFee > 0 ? `رسوم التوصيل: ${order.deliveryFee.toFixed(2)} ر.س<br>` : ''}
+            وقت التجهيز: 15 دقيقة
+          </div>
+
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() { window.close(); }, 600);
+            };
+          </script>
+        </body>
+      </html>
+    `;
 
     const printWindow = window.open('', '_blank', 'width=400,height=600,menubar=no,toolbar=no,location=no,status=no');
     if (printWindow) {
-      printWindow.document.write(printContent);
+      printWindow.document.write(ticketHTML);
+      printWindow.document.close();
+      printWindow.focus();
+
+      if (currentOrderId) updateCurrentOrder({ status: 'sent' });
+      setPrintSuccess(true);
+      setTimeout(() => setPrintSuccess(false), 3000);
+      setKitchenPreviewOrder(null);
+    } else {
+      setKitchenError('الرجاء السماح للنوافذ المنبثقة');
+    }
+  };
+
+  // ============================================
+  // ✅ معالج الطباعة الرئيسي
+  // ============================================
+  const handlePrintReceipt = () => {
+    if (!lastOrder) {
+      setPrintError('لا توجد فاتورة للطباعة');
+      return;
+    }
+    const content = printReceiptHTML(lastOrder);
+    const printWindow = window.open('', '_blank', 'width=400,height=600,menubar=no,toolbar=no,location=no,status=no');
+    if (printWindow) {
+      printWindow.document.write(content);
       printWindow.document.close();
       printWindow.focus();
     } else {
@@ -469,25 +626,34 @@ export function PosScreen() {
 
   const handlePrintKitchen = () => {
     const orderToPrint = lastOrder ?? (cart.length > 0 ? {
-      id: 'temp', number: 0, type: orderType, tableLabel, deliveryZoneId, deliveryFee,
-      items: cart, subtotal, serviceCharge: 0, tax: 0, discount: orderDiscount, total,
-      paymentMethod: 'cash' as PaymentMethod, cashierName: settings.cashierName || 'كاشير',
-      createdAt: new Date().toISOString(), tagIds: orderTagIds, status: 'open' as const,
+      id: 'temp',
+      number: 0,
+      type: orderType,
+      tableLabel,
+      deliveryZoneId,
+      deliveryFee,
+      items: cart,
+      subtotal,
+      serviceCharge: 0,
+      tax: 0,
+      discount: orderDiscount,
+      total: 0,
+      paymentMethod: 'cash' as PaymentMethod,
+      cashierName: settings.cashierName || 'كاشير',
+      createdAt: new Date().toISOString(),
+      tagIds: orderTagIds,
+      status: 'open' as const,
     } : null);
     if (!orderToPrint) return;
     setKitchenPreviewOrder(orderToPrint);
   };
 
   const handleKitchenPrintConfirm = () => {
-    const result = browserPrint();
-    if (!result.success) {
-      setKitchenError(result.error ?? 'فشل طباعة المطبخ');
-    } else {
-      if (currentOrderId) updateCurrentOrder({ status: 'sent' });
-      setPrintSuccess(true);
-      setTimeout(() => setPrintSuccess(false), 3000);
+    if (!kitchenPreviewOrder) {
+      setKitchenError('لا توجد طلبات للطباعة');
+      return;
     }
-    setKitchenPreviewOrder(null);
+    printKitchenTicket(kitchenPreviewOrder);
   };
 
   const processRefund = () => {
@@ -562,7 +728,7 @@ export function PosScreen() {
                     status: 'preview',
                   };
                   setLastOrder(tempOrder);
-                  handlePrintReceipt();
+                  setTimeout(() => handlePrintReceipt(), 200);
                 } else {
                   setPrintError('لا توجد منتجات للطباعة');
                 }
