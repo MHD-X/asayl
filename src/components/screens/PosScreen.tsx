@@ -345,15 +345,15 @@ export function PosScreen() {
               width: 80mm;
               height: ${paperHeight}px;
               margin: 0;
-              padding: 5mm 2mm;
+              padding: 5mm 6mm;
               font-family: 'Courier New', monospace;
-              font-size: 11px;
+              font-size: 10px;
               line-height: 1.3;
               direction: rtl;
               background: white;
               display: flex;
               flex-direction: column;
-              justify-content: center;
+              justify-content: space-between;
             }
             .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 8px; }
             .title { font-size: 18px; font-weight: bold; }
