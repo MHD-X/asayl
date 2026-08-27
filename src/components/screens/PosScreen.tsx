@@ -530,6 +530,14 @@ const printKitchenTicket = (order: Order) => {
     return;
   }
 
+  // ✅ حساب طول الورق بناءً على عدد الأصناف (مثل فاتورة العميل)
+  const itemsCount = order.items.length;
+  const lineHeight = 28;       // ارتفاع كل صنف
+  const headerHeight = 140;    // ارتفاع الرأس
+  const footerHeight = 100;    // ارتفاع التذييل
+  const totalHeight = headerHeight + (itemsCount * lineHeight) + footerHeight;
+  const paperHeight = Math.max(300, totalHeight); // أقل ارتفاع 300px
+
   const ticketHTML = `
     <!DOCTYPE html>
     <html>
@@ -537,58 +545,70 @@ const printKitchenTicket = (order: Order) => {
         <meta charset="UTF-8">
         <title>تذكرة مطبخ #${order.number}</title>
         <style>
-          /* ✅ إعدادات الطباعة */
+          /* ✅ تحديد حجم الورق بدقة */
           @page {
-            size: 80mm auto;
+            size: 80mm ${paperHeight}px;
             margin: 0;
             padding: 0;
           }
+          
           * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
           }
+          
           body {
             width: 80mm;
-            margin: 0 auto;
+            height: ${paperHeight}px;  /* ✅ ارتفاع محدد */
+            margin: 0;
             padding: 5mm 4mm;
             font-family: 'Courier New', monospace;
-            font-size: 14px;
-            line-height: 1.6;
+            font-size: 13px;
+            line-height: 1.5;
             direction: rtl;
             background: white;
-            color: black;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
           }
+          
           .header {
             text-align: center;
             border-bottom: 3px solid #000;
             padding-bottom: 8px;
             margin-bottom: 10px;
           }
+          
           .title {
             font-size: 22px;
             font-weight: bold;
           }
+          
           .sub {
             font-size: 13px;
             margin: 3px 0;
           }
+          
           table {
             width: 100%;
             border-collapse: collapse;
             margin: 6px 0;
           }
+          
           td {
             padding: 6px 0;
             border-bottom: 1px dotted #999;
             font-size: 14px;
           }
+          
           .right {
             text-align: right;
           }
           .center {
             text-align: center;
           }
+          
           .footer {
             border-top: 3px solid #000;
             margin-top: 10px;
@@ -596,6 +616,7 @@ const printKitchenTicket = (order: Order) => {
             text-align: center;
             font-size: 13px;
           }
+          
           .note {
             color: #e67e22;
             font-size: 12px;
@@ -604,11 +625,13 @@ const printKitchenTicket = (order: Order) => {
             border: 1px dashed #e67e22;
             border-radius: 4px;
           }
-          /* ✅ ضمان ظهور المحتوى عند الطباعة */
+          
+          /* ✅ إعدادات الطباعة */
           @media print {
             body {
               margin: 0;
               padding: 5mm 4mm;
+              height: ${paperHeight}px;
             }
             .no-print {
               display: none !important;
@@ -617,29 +640,31 @@ const printKitchenTicket = (order: Order) => {
         </style>
       </head>
       <body>
-        <div class="header">
-          <div class="title">🍽️ تذكرة مطبخ</div>
-          <div class="sub">طلب #${order.number}</div>
-          <div class="sub">${new Date(order.createdAt).toLocaleTimeString('ar-EG')}</div>
-          ${order.tableLabel ? `<div class="sub">طاولة: ${order.tableLabel}</div>` : ''}
-          ${order.type === 'delivery' ? `<div class="sub">📍 توصيل</div>` : ''}
-          ${order.type === 'dine-in' ? `<div class="sub">🏠 صالة</div>` : ''}
-          ${order.type === 'takeaway' ? `<div class="sub">🛍️ سفري</div>` : ''}
-        </div>
+        <div>
+          <div class="header">
+            <div class="title">🍽️ تذكرة مطبخ</div>
+            <div class="sub">طلب #${order.number}</div>
+            <div class="sub">${new Date(order.createdAt).toLocaleTimeString('ar-EG')}</div>
+            ${order.tableLabel ? `<div class="sub">طاولة: ${order.tableLabel}</div>` : ''}
+            ${order.type === 'delivery' ? `<div class="sub">📍 توصيل</div>` : ''}
+            ${order.type === 'dine-in' ? `<div class="sub">🏠 صالة</div>` : ''}
+            ${order.type === 'takeaway' ? `<div class="sub">🛍️ سفري</div>` : ''}
+          </div>
 
-        <table>
-          <tr>
-            <td class="right"><strong>المنتج</strong></td>
-            <td class="center"><strong>الكمية</strong></td>
-          </tr>
-          ${order.items.map(item => `
+          <table>
             <tr>
-              <td class="right">${item.name}</td>
-              <td class="center">${item.qty}</td>
+              <td class="right"><strong>المنتج</strong></td>
+              <td class="center"><strong>الكمية</strong></td>
             </tr>
-            ${item.note ? `<tr><td colspan="2" class="note">📝 ${item.note}</td></tr>` : ''}
-          `).join('')}
-        </table>
+            ${order.items.map(item => `
+              <tr>
+                <td class="right">${item.name}</td>
+                <td class="center">${item.qty}</td>
+              </tr>
+              ${item.note ? `<tr><td colspan="2" class="note">📝 ${item.note}</td></tr>` : ''}
+            `).join('')}
+          </table>
+        </div>
 
         <div class="footer">
           ${order.deliveryFee > 0 ? `رسوم التوصيل: ${order.deliveryFee.toFixed(2)} ر.س<br>` : ''}
@@ -648,12 +673,9 @@ const printKitchenTicket = (order: Order) => {
 
         <script>
           (function() {
-            // ✅ تأكد من تحميل المحتوى بالكامل قبل الطباعة
             window.onload = function() {
-              // ✅ تأخير بسيط لضمان اكتمال العرض
               setTimeout(function() {
                 window.print();
-                // ✅ إغلاق النافذة بعد الطباعة مباشرة
                 setTimeout(function() {
                   window.close();
                 }, 500);
@@ -664,6 +686,23 @@ const printKitchenTicket = (order: Order) => {
       </body>
     </html>
   `;
+
+  // ✅ فتح نافذة جديدة للطباعة
+  const printWindow = window.open('', '_blank', 'width=400,height=600,menubar=no,toolbar=no,location=no,status=no');
+  if (printWindow) {
+    printWindow.document.write(ticketHTML);
+    printWindow.document.close();
+    printWindow.focus();
+
+    // ✅ تحديث حالة الطلب
+    if (currentOrderId) updateCurrentOrder({ status: 'sent' });
+    setPrintSuccess(true);
+    setTimeout(() => setPrintSuccess(false), 3000);
+    setKitchenPreviewOrder(null);
+  } else {
+    setKitchenError('الرجاء السماح للنوافذ المنبثقة');
+  }
+};
 
   // ✅ فتح نافذة جديدة للطباعة
   const printWindow = window.open('', '_blank', 'width=400,height=600,menubar=no,toolbar=no,location=no,status=no');
