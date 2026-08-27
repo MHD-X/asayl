@@ -64,14 +64,18 @@ input[type="number"] {
    🖨️ إعدادات الطباعة للفاتورة الحرارية 80mm
    ============================================ */
 @media print {
-  /* ✅ إخفاء كل العناصر غير المرغوب فيها */
+  /* ✅ إلغاء إخفاء كل العناصر */
+  body * {
+    visibility: visible !important;
+  }
+
+  /* ✅ إخفاء العناصر غير المرغوب فيها فقط */
   .no-print,
   .modal-backdrop,
   .modal-header,
   .modal-footer,
   .modal-overlay,
-  button:not(.print-btn),
-  .print-wrapper > *:not(.print-area) {
+  button:not(.print-btn) {
     display: none !important;
   }
 
@@ -109,17 +113,7 @@ input[type="number"] {
     font-family: 'Courier New', monospace;
   }
 
-  /* ✅ إظهار محتويات منطقة الطباعة فقط */
-  .print-area,
-  .print-area * {
-    visibility: visible !important;
-  }
-
-  /* ✅ إخفاء كل شيء آخر */
-  body * {
-    visibility: hidden !important;
-  }
-
+  /* ✅ إظهار محتويات منطقة الطباعة */
   .print-area,
   .print-area * {
     visibility: visible !important;
