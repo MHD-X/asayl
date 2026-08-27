@@ -523,129 +523,166 @@ export function PosScreen() {
       </html>
     `;
   };
+const printKitchenTicket = (order: Order) => {
+  // ✅ تأكد من وجود بيانات قبل الطباعة
+  if (!order || !order.items || order.items.length === 0) {
+    setKitchenError('لا توجد منتجات للطباعة');
+    return;
+  }
 
-  // ============================================
-  // ✅ دالة طباعة تذكرة المطبخ (معدلة)
-  // ============================================
-  const printKitchenTicket = (order: Order) => {
-    const ticketHTML = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="UTF-8">
-          <title>تذكرة مطبخ #${order.number}</title>
-          <style>
-            @page { 
-              size: 80mm auto; 
-              margin: 0; 
-              padding: 2mm; 
-            }
-            * { margin: 0; padding: 0; box-sizing: border-box; }
+  const ticketHTML = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>تذكرة مطبخ #${order.number}</title>
+        <style>
+          /* ✅ إعدادات الطباعة */
+          @page {
+            size: 80mm auto;
+            margin: 0;
+            padding: 0;
+          }
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+          body {
+            width: 80mm;
+            margin: 0 auto;
+            padding: 5mm 4mm;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            direction: rtl;
+            background: white;
+            color: black;
+          }
+          .header {
+            text-align: center;
+            border-bottom: 3px solid #000;
+            padding-bottom: 8px;
+            margin-bottom: 10px;
+          }
+          .title {
+            font-size: 22px;
+            font-weight: bold;
+          }
+          .sub {
+            font-size: 13px;
+            margin: 3px 0;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 6px 0;
+          }
+          td {
+            padding: 6px 0;
+            border-bottom: 1px dotted #999;
+            font-size: 14px;
+          }
+          .right {
+            text-align: right;
+          }
+          .center {
+            text-align: center;
+          }
+          .footer {
+            border-top: 3px solid #000;
+            margin-top: 10px;
+            padding-top: 10px;
+            text-align: center;
+            font-size: 13px;
+          }
+          .note {
+            color: #e67e22;
+            font-size: 12px;
+            margin: 4px 0;
+            padding: 4px;
+            border: 1px dashed #e67e22;
+            border-radius: 4px;
+          }
+          /* ✅ ضمان ظهور المحتوى عند الطباعة */
+          @media print {
             body {
-              width: 80mm;
               margin: 0;
               padding: 5mm 4mm;
-              font-family: 'Courier New', monospace;
-              font-size: 13px;
-              line-height: 1.5;
-              direction: rtl;
-              background: white;
             }
-            .header { 
-              text-align: center; 
-              border-bottom: 3px solid #000; 
-              padding-bottom: 8px; 
-              margin-bottom: 10px;
+            .no-print {
+              display: none !important;
             }
-            .title { 
-              font-size: 22px; 
-              font-weight: bold; 
-            }
-            .sub { 
-              font-size: 13px; 
-              margin: 3px 0; 
-            }
-            table { 
-              width: 100%; 
-              border-collapse: collapse; 
-              margin: 6px 0;
-            }
-            td { 
-              padding: 5px 0; 
-              border-bottom: 1px dotted #ccc;
-              font-size: 14px;
-            }
-            .right { text-align: right; }
-            .center { text-align: center; }
-            .footer { 
-              border-top: 3px solid #000; 
-              margin-top: 10px; 
-              padding-top: 10px; 
-              text-align: center; 
-              font-size: 13px;
-            }
-            .note { 
-              color: #e67e22; 
-              font-size: 12px; 
-              margin: 4px 0; 
-              padding: 4px; 
-              border: 1px dashed #e67e22; 
-              border-radius: 4px;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div class="title">🍽️ تذكرة مطبخ</div>
-            <div class="sub">طلب #${order.number}</div>
-            <div class="sub">${new Date(order.createdAt).toLocaleTimeString('ar-EG')}</div>
-            ${order.tableLabel ? `<div class="sub">طاولة: ${order.tableLabel}</div>` : ''}
-            ${order.type === 'delivery' ? `<div class="sub">📍 توصيل</div>` : ''}
-          </div>
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="title">🍽️ تذكرة مطبخ</div>
+          <div class="sub">طلب #${order.number}</div>
+          <div class="sub">${new Date(order.createdAt).toLocaleTimeString('ar-EG')}</div>
+          ${order.tableLabel ? `<div class="sub">طاولة: ${order.tableLabel}</div>` : ''}
+          ${order.type === 'delivery' ? `<div class="sub">📍 توصيل</div>` : ''}
+          ${order.type === 'dine-in' ? `<div class="sub">🏠 صالة</div>` : ''}
+          ${order.type === 'takeaway' ? `<div class="sub">🛍️ سفري</div>` : ''}
+        </div>
 
-          <table>
+        <table>
+          <tr>
+            <td class="right"><strong>المنتج</strong></td>
+            <td class="center"><strong>الكمية</strong></td>
+          </tr>
+          ${order.items.map(item => `
             <tr>
-              <td class="right"><strong>المنتج</strong></td>
-              <td class="center"><strong>الكمية</strong></td>
+              <td class="right">${item.name}</td>
+              <td class="center">${item.qty}</td>
             </tr>
-            ${order.items.map(item => `
-              <tr>
-                <td class="right">${item.name}</td>
-                <td class="center">${item.qty}</td>
-              </tr>
-              ${item.note ? `<tr><td colspan="2" class="note">📝 ${item.note}</td></tr>` : ''}
-            `).join('')}
-          </table>
+            ${item.note ? `<tr><td colspan="2" class="note">📝 ${item.note}</td></tr>` : ''}
+          `).join('')}
+        </table>
 
-          <div class="footer">
-            ${order.deliveryFee > 0 ? `رسوم التوصيل: ${order.deliveryFee.toFixed(2)} ر.س<br>` : ''}
-            وقت التجهيز: 15 دقيقة
-          </div>
+        <div class="footer">
+          ${order.deliveryFee > 0 ? `رسوم التوصيل: ${order.deliveryFee.toFixed(2)} ر.س<br>` : ''}
+          وقت التجهيز: 15 دقيقة
+        </div>
 
-          <script>
+        <script>
+          (function() {
+            // ✅ تأكد من تحميل المحتوى بالكامل قبل الطباعة
             window.onload = function() {
-              window.print();
-              setTimeout(function() { window.close(); }, 600);
+              // ✅ تأخير بسيط لضمان اكتمال العرض
+              setTimeout(function() {
+                window.print();
+                // ✅ إغلاق النافذة بعد الطباعة مباشرة
+                setTimeout(function() {
+                  window.close();
+                }, 500);
+              }, 300);
             };
-          </script>
-        </body>
-      </html>
-    `;
+          })();
+        </script>
+      </body>
+    </html>
+  `;
 
-    const printWindow = window.open('', '_blank', 'width=400,height=600,menubar=no,toolbar=no,location=no,status=no');
-    if (printWindow) {
-      printWindow.document.write(ticketHTML);
-      printWindow.document.close();
-      printWindow.focus();
-
-      if (currentOrderId) updateCurrentOrder({ status: 'sent' });
-      setPrintSuccess(true);
-      setTimeout(() => setPrintSuccess(false), 3000);
-      setKitchenPreviewOrder(null);
-    } else {
-      setKitchenError('الرجاء السماح للنوافذ المنبثقة');
-    }
-  };
+  // ✅ فتح نافذة جديدة للطباعة
+  const printWindow = window.open('', '_blank', 'width=400,height=600,menubar=no,toolbar=no,location=no,status=no');
+  if (printWindow) {
+    // ✅ كتابة المحتوى في النافذة
+    printWindow.document.write(ticketHTML);
+    printWindow.document.close();
+    // ✅ التركيز على النافذة لضمان ظهورها
+    printWindow.focus();
+    
+    // ✅ تحديث حالة الطلب
+    if (currentOrderId) updateCurrentOrder({ status: 'sent' });
+    setPrintSuccess(true);
+    setTimeout(() => setPrintSuccess(false), 3000);
+    setKitchenPreviewOrder(null);
+  } else {
+    setKitchenError('الرجاء السماح للنوافذ المنبثقة');
+  }
+};
 
   // ============================================
   // ✅ معالج الطباعة الرئيسي (يعمل من أول ضغطة)
