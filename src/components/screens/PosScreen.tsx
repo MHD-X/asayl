@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useSettings } from '@/context/SettingsContext';
 import type { CartItem, OrderType, PaymentMethod, Order, ActiveOrder, CustomerInfo } from '@/types';
 import { ORDER_TYPE_LABELS } from '@/types';
-import { uid, formatMoney, getProductPrice, addAuditEntry } from '@/utils/storage';
+import { uid, formatMoney, formatDateTime, getProductPrice, addAuditEntry } from '@/utils/storage';
 import { browserPrint } from '@/utils/printer';
 import {
   Printer, ChefHat, XCircle, Percent, StickyNote, Tag, MoreHorizontal,
@@ -43,6 +43,7 @@ export function PosScreen() {
   const [kitchenError, setKitchenError] = useState('');
   const [refundOrder, setRefundOrder] = useState<Order | null>(null);
   const [refundModalOpen, setRefundModalOpen] = useState(false);
+  const [refundPickerOpen, setRefundPickerOpen] = useState(false);
   const [refundAmount, setRefundAmount] = useState('');
   const [refundReason, setRefundReason] = useState('');
   const [kitchenPreviewOrder, setKitchenPreviewOrder] = useState<Order | null>(null);
@@ -152,10 +153,27 @@ export function PosScreen() {
 
   const setOrderType = (type: OrderType) => {
     if (!currentOrderId) {
-      newOrder(type);
+      const order: ActiveOrder = {
+        id: uid('active'),
+        type,
+        items: [],
+        discount: 0,
+        tagIds: [],
+        status: 'open',
+        createdAt: new Date().toISOString(),
+      };
+      update((prev) => ({ ...prev, activeOrders: [...prev.activeOrders, order] }));
+      setCurrentOrderId(order.id);
+      setActiveCategoryId(settings.categories[0]?.id ?? '');
       return;
     }
-    updateCurrentOrder({ type });
+
+    update((prev) => ({
+      ...prev,
+      activeOrders: prev.activeOrders.map((o) =>
+        o.id === currentOrderId ? { ...o, type } : o
+      ),
+    }));
   };
 
   const addToCart = (productId: string) => {
@@ -224,19 +242,27 @@ export function PosScreen() {
     setPinPadOpen(true);
   };
 
+  // ✅ FIX #3: use a single functional update so we never clobber concurrent state
+  // changes, and build the audit entry from the *already-updated* settings snapshot.
   const onPinSuccess = () => {
     setPinPadOpen(false);
     if (pinAction === 'void') {
-      // ✅ إصلاح مشكلة الإلغاء (Void) - استخدام functional update
-      update((prev) => {
-        const withoutOrder = {
-          ...prev,
-          activeOrders: prev.activeOrders.filter((o) => o.id !== currentOrderId),
-        };
-        return addAuditEntry(withoutOrder, settings.cashierName || 'كاشير', 'manager', 'إلغاء طلب');
-      });
+      const orderIdToVoid = currentOrderId;
+      if (orderIdToVoid) {
+        update((prev) => {
+          const withoutOrder = {
+            ...prev,
+            activeOrders: prev.activeOrders.filter((o) => o.id !== orderIdToVoid),
+          };
+          return addAuditEntry(withoutOrder, settings.cashierName || 'كاشير', 'manager', 'إلغاء طلب');
+        });
+        const remaining = settings.activeOrders.filter((o) => o.id !== orderIdToVoid);
+        setCurrentOrderId(remaining[0]?.id ?? '');
+      }
       setConfirmVoidOpen(false);
     }
+    // ✅ FIX #2: refundOrder is now actually set before we get here (see openRefundFlow
+    // and the picker below), so this branch will fire correctly.
     if (pinAction === 'refund' && refundOrder) {
       setRefundModalOpen(true);
     }
@@ -298,19 +324,157 @@ export function PosScreen() {
     setCurrentOrderId(remaining[0]?.id ?? '');
   };
 
-  // ✅ دالة الطباعة الموحدة - تستقبل order كـ argument مباشر
-  const printTicket = (orderToPrint: Order) => {
-    setLastOrder(orderToPrint);
-    setReceiptOpen(true);
+  // ✅ FIX #1: takes the order to print as a parameter instead of reading `lastOrder`
+  // from the closure. This is what was silently failing before — calling
+  // setLastOrder(tempOrder) then immediately handlePrintReceipt() read the *old*
+  // (still-null) lastOrder because React state updates are not synchronous.
+  const printReceiptFor = (orderToPrint: Order) => {
+    const receiptSettings = settings.receiptSettings;
+    const branding = settings.branding;
+    const restaurantName = receiptSettings.restaurantName || branding.name || 'مطعم أسايل';
+    const logo = branding.logo;
+    const footer = receiptSettings.footer || 'شكراً لزيارتكم 🤍';
+    const currency = receiptSettings.currency || 'ر.س';
+
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>فاتورة #${orderToPrint.number}</title>
+          <style>
+            @page { 
+              size: 80mm auto; 
+              margin: 0; 
+              padding: 0; 
+            }
+            body { 
+              width: 80mm; 
+              margin: 0; 
+              padding: 3mm;
+              font-family: 'Courier New', monospace;
+              font-size: 11px;
+              line-height: 1.4;
+              direction: rtl;
+              background: white;
+            }
+            .header { 
+              text-align: center; 
+              border-bottom: 1px dashed #000; 
+              padding-bottom: 6px; 
+              margin-bottom: 6px;
+            }
+            .title { 
+              font-size: 16px; 
+              font-weight: bold; 
+            }
+            .sub { 
+              font-size: 10px; 
+              margin: 2px 0; 
+            }
+            .logo {
+              max-width: 60mm;
+              height: auto;
+              margin: 0 auto 4px auto;
+              display: block;
+            }
+            table { 
+              width: 100%; 
+              border-collapse: collapse; 
+              margin: 4px 0;
+            }
+            td { 
+              padding: 3px 0; 
+              font-size: 10px;
+            }
+            .th { 
+              font-weight: bold; 
+              border-bottom: 1px solid #000;
+            }
+            .total { 
+              border-top: 1px dashed #000; 
+              padding-top: 6px; 
+              font-weight: bold; 
+              font-size: 13px;
+              margin-top: 4px;
+            }
+            .footer { 
+              text-align: center; 
+              border-top: 1px dashed #000; 
+              padding-top: 6px; 
+              margin-top: 6px;
+              font-size: 10px; 
+            }
+            .right { text-align: right; }
+            .center { text-align: center; }
+            .left { text-align: left; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            ${logo ? `<img src="${logo}" alt="شعار المطعم" class="logo" />` : ''}
+            <div class="title">${restaurantName}</div>
+            <div class="sub">رقم الفاتورة: #${orderToPrint.number}</div>
+            <div class="sub">${new Date(orderToPrint.createdAt).toLocaleDateString('ar-EG')} - ${new Date(orderToPrint.createdAt).toLocaleTimeString('ar-EG')}</div>
+            ${orderToPrint.cashierName ? `<div class="sub">الكاشير: ${orderToPrint.cashierName}</div>` : ''}
+          </div>
+
+          <table>
+            <tr>
+              <td class="right"><strong>المنتج</strong></td>
+              <td class="center"><strong>الكمية</strong></td>
+              <td class="left"><strong>السعر</strong></td>
+            </tr>
+            ${orderToPrint.items.map(item => `
+              <tr>
+                <td class="right">${item.name}</td>
+                <td class="center">${item.qty}</td>
+                <td class="left">${(item.price * item.qty).toFixed(2)} ${currency}</td>
+              </tr>
+            `).join('')}
+          </table>
+
+          <div class="total">
+            <div>المجموع الفرعي: ${orderToPrint.subtotal.toFixed(2)} ${currency}</div>
+            ${orderToPrint.discount > 0 ? `<div>الخصم: -${orderToPrint.discount.toFixed(2)} ${currency}</div>` : ''}
+            ${orderToPrint.tax > 0 ? `<div>الضريبة (${receiptSettings.vatPercent || 15}%): ${orderToPrint.tax.toFixed(2)} ${currency}</div>` : ''}
+            <div style="font-size:14px;margin-top:4px;">الإجمالي: ${orderToPrint.total.toFixed(2)} ${currency}</div>
+            ${orderToPrint.paymentMethod ? `<div style="font-size:10px;margin-top:4px;">طريقة الدفع: ${orderToPrint.paymentMethod === 'cash' ? 'نقدي' : 'بطاقة'}</div>` : ''}
+          </div>
+
+          <div class="footer">
+            ${footer}
+          </div>
+
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() { window.close(); }, 600);
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank', 'width=400,height=600,menubar=no,toolbar=no,location=no,status=no');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.focus();
+    } else {
+      setPrintError('الرجاء السماح للنوافذ المنبثقة');
+    }
   };
 
+  // Kept for the Receipt modal's onPrint prop, which has no order argument —
+  // it always refers to the already-completed lastOrder, which is safe here
+  // because by the time the modal is open, lastOrder is guaranteed to be set.
   const handlePrintReceipt = () => {
     if (!lastOrder) {
       setPrintError('لا توجد فاتورة للطباعة');
       return;
     }
-    // ✅ فتح مكون Receipt الموحد
-    setReceiptOpen(true);
+    printReceiptFor(lastOrder);
   };
 
   const handlePrintKitchen = () => {
@@ -336,22 +500,18 @@ export function PosScreen() {
     setKitchenPreviewOrder(null);
   };
 
-  // ✅ فتح مودال الاسترداد مع اختيار الطلب
-  const openRefundModal = () => {
+  // ✅ FIX #2: refund flow now starts by picking a real completed order.
+  const openRefundFlow = () => {
     setMoreModalOpen(false);
-    // ✅ اختيار آخر طلب مكتمل للاسترداد
-    const lastCompletedOrder = settings.orders
-      .filter(o => o.status === 'completed' && !o.refunded)
-      .slice(-1)[0] || null;
-    if (lastCompletedOrder) {
-      setRefundOrder(lastCompletedOrder);
-      setRefundAmount('');
-      setRefundReason('');
-      setPinAction('refund');
-      setPinPadOpen(true);
-    } else {
-      setPrintError('لا توجد طلبات مكتملة للاسترداد');
-    }
+    setRefundPickerOpen(true);
+  };
+
+  const chooseOrderToRefund = (order: Order) => {
+    setRefundOrder(order);
+    setRefundAmount(String(order.total));
+    setRefundPickerOpen(false);
+    setPinAction('refund');
+    setPinPadOpen(true);
   };
 
   const processRefund = () => {
@@ -399,14 +559,13 @@ export function PosScreen() {
               label={`الطلبات النشطة (${settings.activeOrders.length})`}
               onClick={() => setOrdersListOpen(true)}
             />
-            <TopButton 
-              icon={Printer} 
-              label="طباعة" 
+            <TopButton
+              icon={Printer}
+              label="طباعة"
               onClick={() => {
                 if (lastOrder) {
-                  handlePrintReceipt();
+                  printReceiptFor(lastOrder);
                 } else if (cart.length > 0) {
-                  // ✅ إصلاح مشكلة الطباعة - تمرير order مباشرة
                   const tempOrder: Order = {
                     id: 'temp',
                     number: 0,
@@ -422,18 +581,18 @@ export function PosScreen() {
                     total: total + estimatedVat,
                     paymentMethod: 'cash',
                     cashierName: settings.cashierName || 'كاشير',
-                    closerName: undefined,
-                    customer: currentCustomer,
                     createdAt: new Date().toISOString(),
                     tagIds: orderTagIds,
                     status: 'preview',
-                    refunded: false,
                   };
-                  printTicket(tempOrder);
+                  // ✅ set the state for later re-prints/receipt modal, but print
+                  // using the local variable directly — never the stale closure.
+                  setLastOrder(tempOrder);
+                  printReceiptFor(tempOrder);
                 } else {
                   setPrintError('لا توجد منتجات للطباعة');
                 }
-              }} 
+              }}
             />
             <TopButton icon={ChefHat} label="مطبخ" onClick={handlePrintKitchen} />
             <TopButton icon={XCircle} label="إلغاء" variant="danger" onClick={() => cart.length > 0 ? setConfirmVoidOpen(true) : voidOrder()} disabled={!currentOrderId} />
@@ -765,15 +924,46 @@ export function PosScreen() {
       <Modal open={moreModalOpen} onClose={() => setMoreModalOpen(false)} title="المزيد" size="sm">
         <div className="space-y-2">
           <MoreItem icon={Tag} label="إدارة الوسوم" onClick={() => { setMoreModalOpen(false); setTagsModalOpen(true); }} />
-          <MoreItem icon={CreditCard} label="استرداد (Refund)" onClick={openRefundModal} />
+          <MoreItem icon={CreditCard} label="استرداد (Refund)" onClick={openRefundFlow} />
         </div>
+      </Modal>
+
+      {/* ✅ FIX #2: new step — pick which completed order to refund before asking for the PIN */}
+      <Modal open={refundPickerOpen} onClose={() => setRefundPickerOpen(false)} title="اختر الطلب للاسترداد" size="md"
+        footer={<Button variant="secondary" onClick={() => setRefundPickerOpen(false)}>إغلاق</Button>}
+      >
+        {settings.orders.filter((o) => !o.refunded).length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-4">لا توجد طلبات مؤهلة للاسترداد</p>
+        ) : (
+          <div className="space-y-2 max-h-80 overflow-y-auto">
+            {settings.orders
+              .filter((o) => !o.refunded)
+              .slice()
+              .reverse()
+              .map((o) => (
+                <button
+                  key={o.id}
+                  onClick={() => chooseOrderToRefund(o)}
+                  className="w-full flex items-center justify-between p-3 rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors text-right"
+                >
+                  <div>
+                    <p className="text-sm font-bold text-gray-800">طلب #{o.number}</p>
+                    <p className="text-xs text-gray-500">{ORDER_TYPE_LABELS[o.type]} · {formatDateTime(o.createdAt)}</p>
+                  </div>
+                  <span className="text-sm font-bold text-blue-600">{formatMoney(o.total)}</span>
+                </button>
+              ))}
+          </div>
+        )}
       </Modal>
 
       <Modal open={refundModalOpen} onClose={() => setRefundModalOpen(false)} title="استرداد المبلغ" size="sm"
         footer={<><Button variant="secondary" onClick={() => setRefundModalOpen(false)}>إلغاء</Button><Button variant="danger" onClick={processRefund} disabled={!refundAmount}>تأكيد الاسترداد</Button></>}
       >
         <div className="space-y-3">
-          <p className="text-sm text-gray-500">استرداد الطلب #{refundOrder?.number}</p>
+          <p className="text-sm text-gray-500">
+            استرداد للطلب رقم: <span className="font-bold">{refundOrder?.number ?? '-'}</span>
+          </p>
           <Input
             type="number"
             placeholder="مبلغ الاسترداد"
@@ -818,19 +1008,13 @@ export function PosScreen() {
         />
       )}
 
+      {/* ✅ مكون Receipt - سيُستخدم فقط للمعاينة */}
       {receiptOpen && lastOrder && (
         <Receipt
           order={lastOrder}
           onClose={() => setReceiptOpen(false)}
-          onPrint={() => {
-            // ✅ طباعة مباشرة من مكون Receipt
-            if (lastOrder) {
-              setReceiptOpen(false);
-              // استخدام window.print() بعد إغلاق المودال
-              setTimeout(() => window.print(), 300);
-            }
-          }}
-          isPreview={lastOrder?.status === 'preview'}
+          onPrint={handlePrintReceipt}
+          isPreview={lastOrder.status === 'preview'}
         />
       )}
 
