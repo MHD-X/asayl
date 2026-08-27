@@ -320,7 +320,6 @@ export function PosScreen() {
     const totalHeight = headerHeight + (itemsCount * lineHeight) + footerHeight;
     const paperHeight = Math.max(450, totalHeight);
 
-    // تنسيق طريقة الدفع
     const paymentMethodLabels: Record<string, string> = {
       cash: '💵 نقدي',
       visa: '💳 فيزا',
@@ -339,13 +338,13 @@ export function PosScreen() {
           <meta charset="UTF-8">
           <title>فاتورة #${order.number}</title>
           <style>
-            @page { size: 80mm ${paperHeight}px; margin: 0; padding: 0; }
+            @page { size: 80mm ${paperHeight}px; margin: 0; padding: 2mm; }
             * { margin: 0; padding: 0; box-sizing: border-box; }
             body {
               width: 80mm;
               height: ${paperHeight}px;
               margin: 0;
-              padding: 5mm 6mm;
+              padding: 5mm 4mm;
               font-family: 'Courier New', monospace;
               font-size: 10px;
               line-height: 1.3;
@@ -353,43 +352,50 @@ export function PosScreen() {
               background: white;
               display: flex;
               flex-direction: column;
-              justify-content: space-between;
+              justify-content: center;
             }
-            .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 8px; }
-            .title { font-size: 18px; font-weight: bold; }
-            .sub { font-size: 11px; margin: 2px 0; }
-            .slogan { font-size: 13px; color: #555; margin: 2px 0; letter-spacing: 2px; }
-            .logo { max-width: 55mm; height: auto; margin: 0 auto 4px auto; display: block; }
-            .check-info { border: 2px solid #000; border-radius: 4px; padding: 4px 8px; margin: 6px 0; text-align: center; }
-            .check-info .num { font-size: 20px; font-weight: bold; }
-            .info-line { display: flex; justify-content: space-between; font-size: 11px; padding: 2px 0; }
-            table { width: 100%; border-collapse: collapse; margin: 6px 0; }
-            td { padding: 4px 0; font-size: 12px; border-bottom: 1px dotted #ccc; }
-            .th { font-weight: bold; border-bottom: 2px solid #000; font-size: 13px; }
+            .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 6px; margin-bottom: 6px; }
+            .title { font-size: 16px; font-weight: bold; }
+            .sub { font-size: 10px; margin: 2px 0; }
+            .slogan { font-size: 11px; color: #555; margin: 2px 0; letter-spacing: 1px; }
+            .logo { max-width: 50mm; height: auto; margin: 0 auto 4px auto; display: block; }
+            .check-info { border: 2px solid #000; border-radius: 4px; padding: 4px 6px; margin: 4px 0; text-align: center; }
+            .check-info .num { font-size: 18px; font-weight: bold; }
+            .preview-badge { 
+              color: #e67e22; 
+              font-weight: bold; 
+              font-size: 16px; 
+              margin: 6px 0; 
+              text-align: center;
+              background: #fff3e0;
+              padding: 4px 8px;
+              border-radius: 4px;
+              border: 2px solid #e67e22;
+            }
+            .info-line { display: flex; justify-content: space-between; font-size: 10px; padding: 2px 0; }
+            table { width: 100%; border-collapse: collapse; margin: 4px 0; }
+            td { padding: 3px 0; font-size: 10px; border-bottom: 1px dotted #ccc; }
+            .th { font-weight: bold; border-bottom: 2px solid #000; font-size: 11px; }
             .right { text-align: right; }
             .center { text-align: center; }
             .left { text-align: left; }
-            .total-section { border-top: 2px solid #000; padding-top: 6px; margin-top: 4px; }
-            .total-line { display: flex; justify-content: space-between; padding: 2px 0; font-size: 12px; }
-            .total-line.bold { font-weight: bold; font-size: 16px; }
-            .total-line.vat { color: #2980b9; }
-            .total-line.service { color: #2c3e50; }
-            .total-line.discount { color: #e74c3c; }
+            .total-section { border-top: 2px solid #000; padding-top: 4px; margin-top: 4px; }
+            .total-line { display: flex; justify-content: space-between; padding: 2px 0; font-size: 10px; }
+            .total-line.bold { font-weight: bold; font-size: 14px; }
             .payment-box { 
               text-align: center; 
-              margin: 6px 0; 
-              padding: 6px; 
+              margin: 4px 0; 
+              padding: 4px; 
               background: #f8f9fa; 
               border-radius: 4px; 
               border: 1px solid #ddd;
-              font-size: 14px;
+              font-size: 12px;
               font-weight: bold;
             }
-            .footer { text-align: center; border-top: 2px solid #000; padding-top: 8px; margin-top: 8px; font-size: 11px; }
-            .preview-badge { color: #e67e22; font-weight: bold; font-size: 14px; margin: 4px 0; text-align: center; }
-            .customer-info { background: #f5f5f5; padding: 4px 8px; border-radius: 4px; margin: 4px 0; font-size: 11px; }
-            .address-info { font-size: 10px; color: #555; margin: 2px 0; }
-            .products-count { font-size: 11px; color: #666; text-align: center; margin: 4px 0; }
+            .footer { text-align: center; border-top: 2px solid #000; padding-top: 6px; margin-top: 6px; font-size: 10px; }
+            .customer-info { background: #f5f5f5; padding: 4px 6px; border-radius: 4px; margin: 4px 0; font-size: 10px; }
+            .address-info { font-size: 9px; color: #555; margin: 2px 0; }
+            .products-count { font-size: 10px; color: #666; text-align: center; margin: 4px 0; }
           </style>
         </head>
         <body>
@@ -445,7 +451,7 @@ export function PosScreen() {
                   <td class="center">${item.qty}</td>
                   <td class="left">${(item.price * item.qty).toFixed(2)} ${currency}</td>
                 </tr>
-                ${item.note ? `<tr><td colspan="3" style="color:#e67e22;font-size:11px;border-bottom:none;">📝 ${item.note}</td></tr>` : ''}
+                ${item.note ? `<tr><td colspan="3" style="color:#e67e22;font-size:10px;border-bottom:none;">📝 ${item.note}</td></tr>` : ''}
               `).join('')}
             </table>
 
@@ -455,7 +461,7 @@ export function PosScreen() {
                 <span>${order.subtotal.toFixed(2)} ${currency}</span>
               </div>
               ${order.discount > 0 ? `
-                <div class="total-line discount">
+                <div class="total-line" style="color:#e74c3c;">
                   <span>الخصم</span>
                   <span>-${order.discount.toFixed(2)} ${currency}</span>
                 </div>
@@ -467,13 +473,13 @@ export function PosScreen() {
                 </div>
               ` : ''}
               ${order.serviceCharge > 0 ? `
-                <div class="total-line service">
+                <div class="total-line" style="color:#2c3e50;">
                   <span>رسوم الخدمة</span>
                   <span>${order.serviceCharge.toFixed(2)} ${currency}</span>
                 </div>
               ` : ''}
               ${order.tax > 0 ? `
-                <div class="total-line vat">
+                <div class="total-line" style="color:#2980b9;">
                   <span>الضريبة (${receiptSettings.vatPercent || 15}%)</span>
                   <span>${order.tax.toFixed(2)} ${currency}</span>
                 </div>
@@ -497,7 +503,7 @@ export function PosScreen() {
             </div>
 
             ${isPreview ? `
-              <div style="text-align:center;color:#e67e22;font-size:14px;font-weight:bold;margin-top:6px;">
+              <div style="text-align:center;color:#e67e22;font-size:16px;font-weight:bold;margin-top:6px;background:#fff3e0;padding:4px;border-radius:4px;border:2px solid #e67e22;">
                 ⚠️ هذه معاينة فقط - غير مدفوعة
               </div>
             ` : ''}
@@ -519,7 +525,7 @@ export function PosScreen() {
   };
 
   // ============================================
-  // ✅ دالة طباعة تذكرة المطبخ
+  // ✅ دالة طباعة تذكرة المطبخ (معدلة)
   // ============================================
   const printKitchenTicket = (order: Order) => {
     const ticketHTML = `
@@ -529,27 +535,63 @@ export function PosScreen() {
           <meta charset="UTF-8">
           <title>تذكرة مطبخ #${order.number}</title>
           <style>
-            @page { size: 80mm auto; margin: 0; padding: 0; }
+            @page { 
+              size: 80mm auto; 
+              margin: 0; 
+              padding: 2mm; 
+            }
             * { margin: 0; padding: 0; box-sizing: border-box; }
             body {
               width: 80mm;
               margin: 0;
-              padding: 3mm;
+              padding: 5mm 4mm;
               font-family: 'Courier New', monospace;
               font-size: 13px;
               line-height: 1.5;
               direction: rtl;
               background: white;
             }
-            .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 6px; margin-bottom: 8px; }
-            .title { font-size: 20px; font-weight: bold; }
-            .sub { font-size: 12px; margin: 2px 0; }
-            table { width: 100%; border-collapse: collapse; margin: 4px 0; }
-            td { padding: 4px 0; border-bottom: 1px dotted #ccc; font-size: 13px; }
+            .header { 
+              text-align: center; 
+              border-bottom: 3px solid #000; 
+              padding-bottom: 8px; 
+              margin-bottom: 10px;
+            }
+            .title { 
+              font-size: 22px; 
+              font-weight: bold; 
+            }
+            .sub { 
+              font-size: 13px; 
+              margin: 3px 0; 
+            }
+            table { 
+              width: 100%; 
+              border-collapse: collapse; 
+              margin: 6px 0;
+            }
+            td { 
+              padding: 5px 0; 
+              border-bottom: 1px dotted #ccc;
+              font-size: 14px;
+            }
             .right { text-align: right; }
             .center { text-align: center; }
-            .footer { border-top: 2px solid #000; margin-top: 8px; padding-top: 8px; text-align: center; font-size: 12px; }
-            .note { color: #e67e22; font-size: 12px; margin: 4px 0; padding: 4px; border: 1px dashed #e67e22; border-radius: 4px; }
+            .footer { 
+              border-top: 3px solid #000; 
+              margin-top: 10px; 
+              padding-top: 10px; 
+              text-align: center; 
+              font-size: 13px;
+            }
+            .note { 
+              color: #e67e22; 
+              font-size: 12px; 
+              margin: 4px 0; 
+              padding: 4px; 
+              border: 1px dashed #e67e22; 
+              border-radius: 4px;
+            }
           </style>
         </head>
         <body>
@@ -606,7 +648,7 @@ export function PosScreen() {
   };
 
   // ============================================
-  // ✅ معالج الطباعة الرئيسي
+  // ✅ معالج الطباعة الرئيسي (يعمل من أول ضغطة)
   // ============================================
   const handlePrintReceipt = () => {
     if (!lastOrder) {
@@ -728,7 +770,7 @@ export function PosScreen() {
                     status: 'preview',
                   };
                   setLastOrder(tempOrder);
-                  setTimeout(() => handlePrintReceipt(), 200);
+                  handlePrintReceipt();
                 } else {
                   setPrintError('لا توجد منتجات للطباعة');
                 }
