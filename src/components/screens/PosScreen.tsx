@@ -150,7 +150,6 @@ export function PosScreen() {
     }
   };
 
-  // ✅ دالة setOrderType المعدلة (التي تحل مشكلة الأزرار)
   const setOrderType = (type: OrderType) => {
     console.log('🔄 Changing order type to:', type);
     
@@ -315,9 +314,150 @@ export function PosScreen() {
     setCurrentOrderId(remaining[0]?.id ?? '');
   };
 
+  // ✅ دالة الطباعة المباشرة (بدون مودال)
   const handlePrintReceipt = () => {
-    if (!lastOrder) return;
-    window.print();
+    if (!lastOrder) {
+      setPrintError('لا توجد فاتورة للطباعة');
+      return;
+    }
+
+    // ✅ استخدام إعدادات الفاتورة من النظام
+    const receiptSettings = settings.receiptSettings;
+    const branding = settings.branding;
+    const restaurantName = receiptSettings.restaurantName || branding.name || 'مطعم أسايل';
+    const logo = branding.logo;
+    const footer = receiptSettings.footer || 'شكراً لزيارتكم 🤍';
+    const currency = receiptSettings.currency || 'ر.س';
+
+    // ✅ بناء محتوى الفاتورة مباشرة
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>فاتورة #${lastOrder.number}</title>
+          <style>
+            @page { 
+              size: 80mm auto; 
+              margin: 0; 
+              padding: 0; 
+            }
+            body { 
+              width: 80mm; 
+              margin: 0; 
+              padding: 3mm;
+              font-family: 'Courier New', monospace;
+              font-size: 11px;
+              line-height: 1.4;
+              direction: rtl;
+              background: white;
+            }
+            .header { 
+              text-align: center; 
+              border-bottom: 1px dashed #000; 
+              padding-bottom: 6px; 
+              margin-bottom: 6px;
+            }
+            .title { 
+              font-size: 16px; 
+              font-weight: bold; 
+            }
+            .sub { 
+              font-size: 10px; 
+              margin: 2px 0; 
+            }
+            .logo {
+              max-width: 60mm;
+              height: auto;
+              margin: 0 auto 4px auto;
+              display: block;
+            }
+            table { 
+              width: 100%; 
+              border-collapse: collapse; 
+              margin: 4px 0;
+            }
+            td { 
+              padding: 3px 0; 
+              font-size: 10px;
+            }
+            .th { 
+              font-weight: bold; 
+              border-bottom: 1px solid #000;
+            }
+            .total { 
+              border-top: 1px dashed #000; 
+              padding-top: 6px; 
+              font-weight: bold; 
+              font-size: 13px;
+              margin-top: 4px;
+            }
+            .footer { 
+              text-align: center; 
+              border-top: 1px dashed #000; 
+              padding-top: 6px; 
+              margin-top: 6px;
+              font-size: 10px; 
+            }
+            .right { text-align: right; }
+            .center { text-align: center; }
+            .left { text-align: left; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            ${logo ? `<img src="${logo}" alt="شعار المطعم" class="logo" />` : ''}
+            <div class="title">${restaurantName}</div>
+            <div class="sub">رقم الفاتورة: #${lastOrder.number}</div>
+            <div class="sub">${new Date(lastOrder.createdAt).toLocaleDateString('ar-EG')} - ${new Date(lastOrder.createdAt).toLocaleTimeString('ar-EG')}</div>
+            ${lastOrder.cashierName ? `<div class="sub">الكاشير: ${lastOrder.cashierName}</div>` : ''}
+          </div>
+
+          <table>
+            <tr>
+              <td class="right"><strong>المنتج</strong></td>
+              <td class="center"><strong>الكمية</strong></td>
+              <td class="left"><strong>السعر</strong></td>
+            </tr>
+            ${lastOrder.items.map(item => `
+              <tr>
+                <td class="right">${item.name}</td>
+                <td class="center">${item.qty}</td>
+                <td class="left">${(item.price * item.qty).toFixed(2)} ${currency}</td>
+              </tr>
+            `).join('')}
+          </table>
+
+          <div class="total">
+            <div>المجموع الفرعي: ${lastOrder.subtotal.toFixed(2)} ${currency}</div>
+            ${lastOrder.discount > 0 ? `<div>الخصم: -${lastOrder.discount.toFixed(2)} ${currency}</div>` : ''}
+            ${lastOrder.tax > 0 ? `<div>الضريبة (${receiptSettings.vatPercent || 15}%): ${lastOrder.tax.toFixed(2)} ${currency}</div>` : ''}
+            <div style="font-size:14px;margin-top:4px;">الإجمالي: ${lastOrder.total.toFixed(2)} ${currency}</div>
+            ${lastOrder.paymentMethod ? `<div style="font-size:10px;margin-top:4px;">طريقة الدفع: ${lastOrder.paymentMethod === 'cash' ? 'نقدي' : 'بطاقة'}</div>` : ''}
+          </div>
+
+          <div class="footer">
+            ${footer}
+          </div>
+
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() { window.close(); }, 600);
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank', 'width=400,height=600,menubar=no,toolbar=no,location=no,status=no');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.focus();
+    } else {
+      setPrintError('الرجاء السماح للنوافذ المنبثقة');
+    }
   };
 
   const handlePrintKitchen = () => {
@@ -393,7 +533,7 @@ export function PosScreen() {
               label="طباعة" 
               onClick={() => {
                 if (lastOrder) {
-                  setReceiptOpen(true);
+                  handlePrintReceipt();
                 } else if (cart.length > 0) {
                   const tempOrder: any = {
                     id: 'temp',
@@ -415,7 +555,7 @@ export function PosScreen() {
                     status: 'preview',
                   };
                   setLastOrder(tempOrder);
-                  setReceiptOpen(true);
+                  handlePrintReceipt();
                 } else {
                   setPrintError('لا توجد منتجات للطباعة');
                 }
@@ -809,6 +949,7 @@ export function PosScreen() {
         />
       )}
 
+      {/* ✅ مكون Receipt - سيُستخدم فقط للمعاينة */}
       {receiptOpen && lastOrder && (
         <Receipt
           order={lastOrder}
