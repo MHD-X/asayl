@@ -528,13 +528,12 @@ export function PosScreen() {
   // ✅ دالة طباعة تذكرة المطبخ (معدلة بالكامل)
   // ============================================
   const printKitchenTicket = (order: Order) => {
-  // ✅ تأكد من وجود بيانات قبل الطباعة
   if (!order || !order.items || order.items.length === 0) {
     setKitchenError('لا توجد منتجات للطباعة');
     return;
   }
 
-  // ✅ حساب طول الورق بناءً على عدد الأصناف (مثل فاتورة العميل)
+  // ✅ حساب طول الورق بناءً على عدد الأصناف
   const itemsCount = order.items.length;
   const lineHeight = 28;
   const headerHeight = 140;
@@ -549,24 +548,37 @@ export function PosScreen() {
         <meta charset="UTF-8">
         <title>تذكرة مطبخ #${order.number}</title>
         <style>
-          /* ✅ نفس إعدادات فاتورة العميل */
+          /* ✅ إعدادات الصفحة */
           @page {
             size: 80mm ${paperHeight}px;
             margin: 0;
-            padding: 0mm;
+            padding: 0;
+            orientation: portrait;
           }
+          
+          /* ✅ إعادة تعيين جميع الهوامش */
           * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
           }
+          
+          /* ✅ جسم الصفحة */
+          html, body {
+            width: 80mm;
+            height: ${paperHeight}px;
+            margin: 0;
+            padding: 0;
+            background: white;
+          }
+          
           body {
             width: 80mm;
             height: ${paperHeight}px;
             margin: 0;
-            padding: 3mm 2mm;
+            padding: 5mm 4mm;
             font-family: 'Courier New', monospace;
-            font-size: 12px;
+            font-size: 13px;
             line-height: 1.5;
             direction: rtl;
             background: white;
@@ -574,39 +586,47 @@ export function PosScreen() {
             flex-direction: column;
             justify-content: space-between;
           }
+          
           .header {
             text-align: center;
             border-bottom: 3px solid #000;
             padding-bottom: 8px;
             margin-bottom: 10px;
           }
+          
           .title {
-            font-size: 20px;
+            font-size: 22px;
             font-weight: bold;
           }
+          
           .sub {
-            font-size: 12px;
+            font-size: 13px;
             margin: 3px 0;
           }
+          
           table {
             width: 100%;
             border-collapse: collapse;
             margin: 6px 0;
           }
+          
           td {
             padding: 6px 0;
             border-bottom: 1px dotted #999;
-            font-size: 13px;
+            font-size: 14px;
           }
+          
           .right { text-align: right; }
           .center { text-align: center; }
+          
           .footer {
             border-top: 3px solid #000;
             margin-top: 10px;
             padding-top: 10px;
             text-align: center;
-            font-size: 12px;
+            font-size: 13px;
           }
+          
           .note {
             color: #e67e22;
             font-size: 12px;
@@ -615,10 +635,16 @@ export function PosScreen() {
             border: 1px dashed #e67e22;
             border-radius: 4px;
           }
-          /* ✅ نفس إعدادات الطباعة */
+
+          /* ✅ إعدادات الطباعة */
           @media print {
-            body {
+            html, body {
+              width: 80mm;
+              height: ${paperHeight}px;
               margin: 0;
+              padding: 0;
+            }
+            body {
               padding: 5mm 4mm;
               height: ${paperHeight}px;
             }
@@ -690,7 +716,6 @@ export function PosScreen() {
     setKitchenError('الرجاء السماح للنوافذ المنبثقة');
   }
 };
-
   // ============================================
   // ✅ معالج الطباعة الرئيسي
   // ============================================
