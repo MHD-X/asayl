@@ -549,12 +549,12 @@ export function PosScreen() {
         <title>تذكرة مطبخ #${order.number}</title>
         <style>
           /* ✅ إعدادات الصفحة */
-          @page {
-            size: 80mm ${paperHeight}px;
-            margin: 0;
-            padding: 0;
-            orientation: portrait;
-          }
+         @page {
+                  size: 80mm auto;           /* ✅ عرض ثابت + طول تلقائي */
+                  margin: 0;
+                  padding: 0;
+                  orientation: portrait;     /* ✅ فرض العمودي */
+              }
           
           /* ✅ إعادة تعيين جميع الهوامش */
           * {
