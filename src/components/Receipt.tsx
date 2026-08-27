@@ -19,6 +19,11 @@ const ORDER_TYPE_EN: Record<string, string> = {
   talabat: 'Talabat',
 };
 
+// ⚠️ NOTE: This on-screen preview and the actual printed ticket built in
+// PosScreen.printReceiptFor() are two separate templates. If you change the
+// receipt layout, branding, or fields shown here, mirror the change in
+// PosScreen.tsx's printReceiptFor() HTML string too, or the printed paper
+// receipt will silently drift out of sync with this preview.
 export function Receipt({ order, onClose, onPrint, isPreview = false }: ReceiptProps) {
   const { settings } = useSettings();
   const r = settings.receiptSettings;
