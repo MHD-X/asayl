@@ -553,7 +553,7 @@ export function PosScreen() {
           @page {
             size: 80mm ${paperHeight}px;
             margin: 0;
-            padding: 2mm;
+            padding: 0mm;
           }
           * {
             margin: 0;
@@ -564,7 +564,7 @@ export function PosScreen() {
             width: 80mm;
             height: ${paperHeight}px;
             margin: 0;
-            padding: 5mm 4mm;
+            padding: 3mm 2mm;
             font-family: 'Courier New', monospace;
             font-size: 12px;
             line-height: 1.5;
