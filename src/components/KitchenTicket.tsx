@@ -1,19 +1,169 @@
 import type { Order } from '@/types';
 import { ORDER_TYPE_LABELS } from '@/types';
-import { formatDateTime } from '@/utils/storage';
+import { formatMoney } from '@/utils/storage';
 import { Modal, Button } from '@/components/ui/Modal';
 import { Printer, X } from 'lucide-react';
 
 interface KitchenTicketProps {
   order: Order;
   onClose: () => void;
-  onPrinted: () => void; // يُستدعى بعد إرسال أمر الطباعة: لتحديث حالة الطلب وإغلاق المعاينة
+  onPrinted?: () => void;
 }
 
 export function KitchenTicket({ order, onClose, onPrinted }: KitchenTicketProps) {
+  // ✅ حساب طول الورق تلقائياً
+  const itemsCount = order.items.length;
+  const lineHeight = 28;
+  const headerHeight = 140;
+  const footerHeight = 100;
+  const totalHeight = headerHeight + (itemsCount * lineHeight) + footerHeight;
+  const paperHeight = Math.max(300, totalHeight);
+
+  // ✅ بناء HTML التذكرة
+  const buildTicketHTML = () => {
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>تذكرة مطبخ #${order.number}</title>
+          <style>
+            @page {
+              size: 80mm ${paperHeight}px;
+              margin: 0;
+              padding: 0;
+              orientation: portrait;
+            }
+            * {
+              margin: 0;
+              padding: 0;
+              box-sizing: border-box;
+            }
+            html, body {
+              width: 80mm;
+              height: ${paperHeight}px;
+              margin: 0;
+              padding: 0;
+              background: white;
+            }
+            body {
+              width: 80mm;
+              height: ${paperHeight}px;
+              margin: 0;
+              padding: 5mm 4mm;
+              font-family: 'Courier New', monospace;
+              font-size: 13px;
+              line-height: 1.5;
+              direction: rtl;
+              background: white;
+              display: flex;
+              flex-direction: column;
+              justify-content: space-between;
+            }
+            .header {
+              text-align: center;
+              border-bottom: 3px solid #000;
+              padding-bottom: 8px;
+              margin-bottom: 10px;
+            }
+            .title {
+              font-size: 22px;
+              font-weight: bold;
+            }
+            .sub {
+              font-size: 13px;
+              margin: 3px 0;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin: 6px 0;
+            }
+            td {
+              padding: 6px 0;
+              border-bottom: 1px dotted #999;
+              font-size: 14px;
+            }
+            .right { text-align: right; }
+            .center { text-align: center; }
+            .footer {
+              border-top: 3px solid #000;
+              margin-top: 10px;
+              padding-top: 10px;
+              text-align: center;
+              font-size: 13px;
+            }
+            .note {
+              color: #e67e22;
+              font-size: 12px;
+              margin: 4px 0;
+              padding: 4px;
+              border: 1px dashed #e67e22;
+              border-radius: 4px;
+            }
+          </style>
+        </head>
+        <body>
+          <div>
+            <div class="header">
+              <div class="title">🍽️ تذكرة مطبخ</div>
+              <div class="sub">طلب #${order.number}</div>
+              <div class="sub">${new Date(order.createdAt).toLocaleTimeString('ar-EG')}</div>
+              ${order.tableLabel ? `<div class="sub">طاولة: ${order.tableLabel}</div>` : ''}
+              ${order.type === 'delivery' ? `<div class="sub">📍 توصيل</div>` : ''}
+              ${order.type === 'dine-in' ? `<div class="sub">🏠 صالة</div>` : ''}
+              ${order.type === 'takeaway' ? `<div class="sub">🛍️ سفري</div>` : ''}
+            </div>
+
+            <table>
+              <tr>
+                <td class="right"><strong>المنتج</strong></td>
+                <td class="center"><strong>الكمية</strong></td>
+              </tr>
+              ${order.items.map(item => `
+                <tr>
+                  <td class="right">${item.name}</td>
+                  <td class="center">${item.qty}</td>
+                </tr>
+                ${item.note ? `<tr><td colspan="2" class="note">📝 ${item.note}</td></tr>` : ''}
+              `).join('')}
+            </table>
+          </div>
+
+          <div class="footer">
+            ${order.deliveryFee > 0 ? `رسوم التوصيل: ${order.deliveryFee.toFixed(2)} ر.س<br>` : ''}
+            وقت التجهيز: 15 دقيقة
+          </div>
+
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+                setTimeout(function() {
+                  window.close();
+                }, 500);
+              }, 300);
+            };
+          </script>
+        </body>
+      </html>
+    `;
+  };
+
+  // ✅ طباعة مباشرة
   const handlePrint = () => {
-    window.print();
-    onPrinted();
+    const printWindow = window.open('', '_blank', 'width=400,height=600,menubar=no,toolbar=no,location=no,status=no');
+    if (printWindow) {
+      printWindow.document.write(buildTicketHTML());
+      printWindow.document.close();
+      printWindow.focus();
+      
+      // ✅ إغلاق نافذة المعاينة بعد الطباعة
+      if (onPrinted) onPrinted();
+      onClose();
+    } else {
+      alert('الرجاء السماح للنوافذ المنبثقة');
+    }
   };
 
   return (
@@ -35,65 +185,50 @@ export function KitchenTicket({ order, onClose, onPrinted }: KitchenTicketProps)
         <div
           className="print-area thermal-receipt bg-white font-mono text-gray-900"
           dir="rtl"
-          style={{ width: '80mm', padding: '4mm 3mm' }}
+          style={{
+            width: '80mm',
+            height: `${paperHeight}px`,
+            padding: '5mm 4mm',
+            margin: '0 auto',
+            background: 'white',
+            fontSize: '13px',
+            lineHeight: '1.5',
+            direction: 'rtl',
+            fontFamily: "'Courier New', monospace",
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+          }}
         >
-          <div className="text-center mb-2">
-            <p className="font-bold text-base">تذكرة المطبخ</p>
-            <p className="font-bold text-lg mt-1">Order# {order.number}</p>
-            <p className="text-xs text-gray-600 mt-0.5">{ORDER_TYPE_LABELS[order.type]}</p>
-            {order.tableLabel && (
-              <p className="text-xs text-gray-600">الطاولة: {order.tableLabel}</p>
-            )}
-            <p className="text-xs text-gray-500 mt-0.5">{formatDateTime(order.createdAt)}</p>
+          <div>
+            <div style={{ textAlign: 'center', borderBottom: '3px solid #000', paddingBottom: '8px', marginBottom: '10px' }}>
+              <div style={{ fontSize: '22px', fontWeight: 'bold' }}>🍽️ تذكرة مطبخ</div>
+              <div style={{ fontSize: '13px', margin: '3px 0' }}>طلب #{order.number}</div>
+              <div style={{ fontSize: '13px', margin: '3px 0' }}>{new Date(order.createdAt).toLocaleTimeString('ar-EG')}</div>
+              {order.tableLabel && <div style={{ fontSize: '13px', margin: '3px 0' }}>طاولة: {order.tableLabel}</div>}
+              {order.type === 'delivery' && <div style={{ fontSize: '13px', margin: '3px 0' }}>📍 توصيل</div>}
+              {order.type === 'dine-in' && <div style={{ fontSize: '13px', margin: '3px 0' }}>🏠 صالة</div>}
+              {order.type === 'takeaway' && <div style={{ fontSize: '13px', margin: '3px 0' }}>🛍️ سفري</div>}
+            </div>
+
+            <table style={{ width: '100%', borderCollapse: 'collapse', margin: '6px 0' }}>
+              <tr>
+                <td style={{ padding: '6px 0', borderBottom: '1px dotted #999', fontSize: '14px', textAlign: 'right' }}><strong>المنتج</strong></td>
+                <td style={{ padding: '6px 0', borderBottom: '1px dotted #999', fontSize: '14px', textAlign: 'center' }}><strong>الكمية</strong></td>
+              </tr>
+              {order.items.map((item, i) => (
+                <tr key={i}>
+                  <td style={{ padding: '6px 0', borderBottom: '1px dotted #999', fontSize: '14px', textAlign: 'right' }}>{item.name}</td>
+                  <td style={{ padding: '6px 0', borderBottom: '1px dotted #999', fontSize: '14px', textAlign: 'center' }}>{item.qty}</td>
+                </tr>
+              ))}
+            </table>
           </div>
 
-          {order.customer && (order.customer.name || order.customer.phone || order.customer.address) && (
-            <div className="border-t border-dashed border-gray-400 pt-1.5 mb-1.5 space-y-0.5 text-xs">
-              {order.customer.name && (
-                <div className="flex justify-between">
-                  <span>العميل:</span>
-                  <span className="font-semibold">{order.customer.name}</span>
-                </div>
-              )}
-              {order.customer.phone && (
-                <div className="flex justify-between">
-                  <span>الهاتف:</span>
-                  <span className="font-semibold">{order.customer.phone}</span>
-                </div>
-              )}
-              {order.customer.address && (
-                <div className="flex justify-between">
-                  <span>العنوان:</span>
-                  <span className="font-semibold text-left">{order.customer.address}</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          <div className="border-t border-dashed border-gray-400 pt-1.5 mb-1.5">
-            {order.items.map((item, i) => (
-              <div key={i} className="py-1 border-b border-dotted border-gray-200">
-                <div className="flex text-sm font-bold">
-                  <span className="w-10 text-center">{item.qty}x</span>
-                  <span className="flex-1">{item.name}</span>
-                </div>
-                {item.note && (
-                  <p className="text-xs text-gray-500 pr-2">* {item.note}</p>
-                )}
-                {item.modifiers?.map((mod, mi) => (
-                  <div key={mi} className="flex text-xs text-gray-500 pr-2">
-                    <span className="flex-1">+ {mod.optionName}</span>
-                  </div>
-                ))}
-              </div>
-            ))}
+          <div style={{ borderTop: '3px solid #000', marginTop: '10px', paddingTop: '10px', textAlign: 'center', fontSize: '13px' }}>
+            {order.deliveryFee > 0 ? `رسوم التوصيل: ${order.deliveryFee.toFixed(2)} ر.س<br>` : ''}
+            وقت التجهيز: 15 دقيقة
           </div>
-
-          {order.deliveryFee > 0 && (
-            <div className="text-center border-t border-dashed border-gray-400 pt-2 mt-1 text-xs">
-              رسوم التوصيل: {order.deliveryFee.toFixed(2)} ر.س
-            </div>
-          )}
         </div>
       </div>
     </Modal>
