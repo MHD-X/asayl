@@ -523,140 +523,26 @@ export function PosScreen() {
       </html>
     `;
   };
-
- // ============================================
-// ✅ دالة طباعة تذكرة المطبخ (مصححة)
-// ============================================
-const printKitchenTicket = (order: Order) => {
-  if (!order || !order.items || order.items.length === 0) {
-    setKitchenError('لا توجد منتجات للطباعة');
-    return;
-  }
-
-  const ticketHTML = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>تذكرة مطبخ #${order.number}</title>
-        <style>
-          @page {
-            size: 80mm auto;
-            margin: 0;
-          }
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          html, body { width: 80mm; background: white; }
-          body {
-            padding: 4mm 4mm;
-            font-family: 'Courier New', monospace;
-            font-size: 13px;
-            line-height: 1.5;
-            direction: rtl;
-            background: white;
-          }
-          .header {
-            text-align: center;
-            border-bottom: 3px solid #000;
-            padding-bottom: 8px;
-            margin-bottom: 10px;
-          }
-          .title { font-size: 22px; font-weight: bold; }
-          .sub { font-size: 13px; margin: 3px 0; }
-          table { width: 100%; border-collapse: collapse; margin: 6px 0; }
-          td { padding: 6px 0; border-bottom: 1px dotted #999; font-size: 14px; }
-          .right { text-align: right; }
-          .center { text-align: center; }
-          .footer {
-            border-top: 3px solid #000;
-            margin-top: 10px;
-            padding-top: 10px;
-            text-align: center;
-            font-size: 13px;
-          }
-          .note {
-            color: #e67e22;
-            font-size: 12px;
-            margin: 4px 0;
-            padding: 4px;
-            border: 1px dashed #e67e22;
-            border-radius: 4px;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <div class="title">🍽️ تذكرة مطبخ</div>
-          <div class="sub">طلب #${order.number}</div>
-          <div class="sub">${new Date(order.createdAt).toLocaleTimeString('ar-EG')}</div>
-          ${order.tableLabel ? `<div class="sub">طاولة: ${order.tableLabel}</div>` : ''}
-          ${order.type === 'delivery' ? `<div class="sub">📍 توصيل</div>` : ''}
-          ${order.type === 'dine-in' ? `<div class="sub">🏠 صالة</div>` : ''}
-          ${order.type === 'takeaway' ? `<div class="sub">🛍️ سفري</div>` : ''}
-        </div>
-
-        <table>
-          <tr>
-            <td class="right"><strong>المنتج</strong></td>
-            <td class="center"><strong>الكمية</strong></td>
-          </tr>
-          ${order.items.map(item => `
-            <tr>
-              <td class="right">${item.name}</td>
-              <td class="center">${item.qty}</td>
-            </tr>
-            ${item.note ? `<tr><td colspan="2" class="note">📝 ${item.note}</td></tr>` : ''}
-          `).join('')}
-        </table>
-
-        <div class="footer">
-          ${order.deliveryFee > 0 ? `رسوم التوصيل: ${order.deliveryFee.toFixed(2)} ر.س<br>` : ''}
-          وقت التجهيز: 15 دقيقة
-        </div>
-
-        <script>
-          window.onload = function() {
-            window.print();
-            setTimeout(function() { window.close(); }, 500);
-          };
-        </script>
-      </body>
-    </html>
-  `;
-
-  const printWindow = window.open('', '_blank', 'width=400,height=600,menubar=no,toolbar=no,location=no,status=no');
-  if (printWindow) {
-    printWindow.document.write(ticketHTML);
-    printWindow.document.close();
-    printWindow.focus();
-
-    if (currentOrderId) updateCurrentOrder({ status: 'sent' });
-    setPrintSuccess(true);
-    setTimeout(() => setPrintSuccess(false), 3000);
-    setKitchenPreviewOrder(null);
-  } else {
-    setKitchenError('الرجاء السماح للنوافذ المنبثقة');
-  }
-};
-
-// ============================================
-// ✅ رقم مؤقت وفريد لأي طلب لم يُدفع بعد
-// (يعتمد على وقت إنشاء الطلب النشط، فيبقى ثابتًا
-//  لو أعدت طباعته أكثر من مرة، ومختلف بين الطلبات)
+///////////////////////////////////////////
+  // ============================================
+// ✅ رقم مؤقت وفريد لأي طلب لم يُدفع بعد بعد
+// (مبني على وقت إنشاء الطلب النشط، يبقى ثابتًا لو
+//  فتحت المعاينة أكثر من مرة، ومختلف بين الطلبات)
 // ============================================
 const getPreviewNumber = (activeOrder: { createdAt: string }) => {
   return Number(new Date(activeOrder.createdAt).getTime().toString().slice(-4));
 };
 
 // ============================================
-// ✅ معالج طباعة المطبخ (مصحح)
+// ✅ معالج فتح معاينة تذكرة المطبخ
 // ============================================
 const handlePrintKitchen = () => {
-  const orderToPrint = lastOrder ?? (currentOrder && cart.length > 0 ? {
+  const orderToPreview: Order | null = lastOrder ?? (currentOrder && cart.length > 0 ? {
     id: 'temp',
     number: getPreviewNumber(currentOrder),
     type: orderType,
-    tableLabel: tableLabel || '',
-    deliveryZoneId: deliveryZoneId || '',
+    tableLabel: tableLabel || undefined,
+    deliveryZoneId: deliveryZoneId || undefined,
     deliveryFee: deliveryFee || 0,
     items: cart.map(item => ({ ...item })),
     subtotal: subtotal || 0,
@@ -671,12 +557,22 @@ const handlePrintKitchen = () => {
     status: 'open' as const,
   } : null);
 
-  if (!orderToPrint) {
+  if (!orderToPreview) {
     setKitchenError('لا توجد طلبات للطباعة');
     return;
   }
 
-  printKitchenTicket(orderToPrint);
+  setKitchenPreviewOrder(orderToPreview);
+};
+
+// ============================================
+// ✅ يُستدعى من KitchenTicket بعد الضغط على "طباعة"
+// ============================================
+const onKitchenTicketPrinted = () => {
+  if (currentOrderId) updateCurrentOrder({ status: 'sent' });
+  setPrintSuccess(true);
+  setTimeout(() => setPrintSuccess(false), 3000);
+  setKitchenPreviewOrder(null);
 };
 
   // ============================================
