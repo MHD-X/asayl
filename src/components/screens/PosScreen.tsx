@@ -301,220 +301,6 @@ export function PosScreen() {
   };
 
   // ============================================
-  // ✅ دالة طباعة فاتورة العميل
-  // (مصححة: @page الآن "80mm auto" بدون خلط وحدات
-  //  mm/px، فالورق يطول أو يقصر تلقائيًا حسب المحتوى
-  //  بدل ارتفاع ثابت كان يسبب طباعة بالعرض أحيانًا)
-  // ============================================
-  const printReceiptHTML = (order: Order) => {
-    const receiptSettings = settings.receiptSettings;
-    const branding = settings.branding;
-    const restaurantName = receiptSettings.restaurantName || branding.name || 'مطعم أسايل';
-    const logo = branding.logo;
-    const footer = receiptSettings.footer || 'شكراً لزيارتكم 🤍';
-    const currency = receiptSettings.currency || 'ر.س';
-    const isPreview = order.status === 'preview';
-
-    const paymentMethodLabels: Record<string, string> = {
-      cash: '💵 نقدي',
-      visa: '💳 فيزا',
-      'talabat-cash': '📱 كاش طلبات',
-      'talabat-visa': '📱 فيزا طلبات',
-      rappit: '🛵 رابيت',
-      'petrol-card': '⛽ بطاقة بنزين',
-    };
-
-    const paymentLabel = order.paymentMethod ? paymentMethodLabels[order.paymentMethod] || order.paymentMethod : '';
-
-    return `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="UTF-8">
-          <title>فاتورة #${order.number}</title>
-          <style>
-            @page { size: 80mm auto; margin: 0; }
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            html, body { width: 80mm; background: white; }
-            body {
-              padding: 5mm 4mm;
-              font-family: 'Courier New', monospace;
-              font-size: 10px;
-              line-height: 1.3;
-              direction: rtl;
-              background: white;
-            }
-            .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 6px; margin-bottom: 6px; }
-            .title { font-size: 16px; font-weight: bold; }
-            .sub { font-size: 10px; margin: 2px 0; }
-            .slogan { font-size: 11px; color: #555; margin: 2px 0; letter-spacing: 1px; }
-            .logo { max-width: 50mm; height: auto; margin: 0 auto 4px auto; display: block; }
-            .check-info { border: 2px solid #000; border-radius: 4px; padding: 4px 6px; margin: 4px 0; text-align: center; }
-            .check-info .num { font-size: 18px; font-weight: bold; }
-            .preview-badge { 
-              color: #e67e22; 
-              font-weight: bold; 
-              font-size: 16px; 
-              margin: 6px 0; 
-              text-align: center;
-              background: #fff3e0;
-              padding: 4px 8px;
-              border-radius: 4px;
-              border: 2px solid #e67e22;
-            }
-            .info-line { display: flex; justify-content: space-between; font-size: 10px; padding: 2px 0; }
-            table { width: 100%; border-collapse: collapse; margin: 4px 0; }
-            td { padding: 3px 0; font-size: 10px; border-bottom: 1px dotted #ccc; }
-            .th { font-weight: bold; border-bottom: 2px solid #000; font-size: 11px; }
-            .right { text-align: right; }
-            .center { text-align: center; }
-            .left { text-align: left; }
-            .total-section { border-top: 2px solid #000; padding-top: 4px; margin-top: 4px; }
-            .total-line { display: flex; justify-content: space-between; padding: 2px 0; font-size: 10px; }
-            .total-line.bold { font-weight: bold; font-size: 14px; }
-            .payment-box { 
-              text-align: center; 
-              margin: 4px 0; 
-              padding: 4px; 
-              background: #f8f9fa; 
-              border-radius: 4px; 
-              border: 1px solid #ddd;
-              font-size: 12px;
-              font-weight: bold;
-            }
-            .footer { text-align: center; border-top: 2px solid #000; padding-top: 6px; margin-top: 6px; font-size: 10px; }
-            .customer-info { background: #f5f5f5; padding: 4px 6px; border-radius: 4px; margin: 4px 0; font-size: 10px; }
-            .address-info { font-size: 9px; color: #555; margin: 2px 0; }
-            .products-count { font-size: 10px; color: #666; text-align: center; margin: 4px 0; }
-          </style>
-        </head>
-        <body>
-          <div>
-            <div class="header">
-              ${logo ? `<img src="${logo}" alt="شعار المطعم" class="logo" />` : ''}
-              <div class="title">${restaurantName}</div>
-              <div class="slogan">${receiptSettings.subtitle || ''}</div>
-              ${isPreview ? '<div class="preview-badge">⚠️ معاينة - غير مدفوعة</div>' : ''}
-            </div>
-
-            <div class="check-info">
-              <span class="num">Check</span>
-              <span class="num" style="margin-right:4px;">#${order.number}</span>
-            </div>
-
-            <div class="info-line">
-              <span>Printed At:</span>
-              <span>${new Date().toLocaleString('ar-EG')}</span>
-            </div>
-            ${order.type === 'delivery' ? `
-              <div class="info-line">
-                <span>Delivery Check#:</span>
-                <span>${order.number}</span>
-              </div>
-            ` : ''}
-            <div class="info-line">
-              <span>Check In:</span>
-              <span>${new Date(order.createdAt).toLocaleString('ar-EG')}</span>
-            </div>
-
-            <div class="info-line">
-              <span>Creator:</span>
-              <span>${order.cashierName || 'كاشير'}</span>
-            </div>
-
-            ${order.customer ? `
-              <div class="customer-info">
-                <div>Customer: ${order.customer.name || ''} ${order.customer.phone ? `Mobile: ${order.customer.phone}` : ''}</div>
-                ${order.customer.address ? `<div class="address-info">Address: ${order.customer.address}</div>` : ''}
-              </div>
-            ` : ''}
-
-            <table>
-              <tr class="th">
-                <td class="right">المنتج</td>
-                <td class="center">الكمية</td>
-                <td class="left">السعر</td>
-              </tr>
-              ${order.items.map(item => `
-                <tr>
-                  <td class="right">${item.name}</td>
-                  <td class="center">${item.qty}</td>
-                  <td class="left">${(item.price * item.qty).toFixed(2)} ${currency}</td>
-                </tr>
-                ${item.note ? `<tr><td colspan="3" style="color:#e67e22;font-size:10px;border-bottom:none;">📝 ${item.note}</td></tr>` : ''}
-              `).join('')}
-            </table>
-
-            <div class="total-section">
-              <div class="total-line">
-                <span>المجموع الفرعي</span>
-                <span>${order.subtotal.toFixed(2)} ${currency}</span>
-              </div>
-              ${order.discount > 0 ? `
-                <div class="total-line" style="color:#e74c3c;">
-                  <span>الخصم</span>
-                  <span>-${order.discount.toFixed(2)} ${currency}</span>
-                </div>
-              ` : ''}
-              ${order.deliveryFee > 0 ? `
-                <div class="total-line">
-                  <span>رسوم التوصيل</span>
-                  <span>${order.deliveryFee.toFixed(2)} ${currency}</span>
-                </div>
-              ` : ''}
-              ${order.serviceCharge > 0 ? `
-                <div class="total-line" style="color:#2c3e50;">
-                  <span>رسوم الخدمة</span>
-                  <span>${order.serviceCharge.toFixed(2)} ${currency}</span>
-                </div>
-              ` : ''}
-              ${order.tax > 0 ? `
-                <div class="total-line" style="color:#2980b9;">
-                  <span>الضريبة (${receiptSettings.vatPercent || 15}%)</span>
-                  <span>${order.tax.toFixed(2)} ${currency}</span>
-                </div>
-              ` : ''}
-              <div style="border-top:2px solid #000;margin:4px 0;padding-top:4px;">
-                <div class="total-line bold">
-                  <span>الإجمالي</span>
-                  <span>${order.total.toFixed(2)} ${currency}</span>
-                </div>
-              </div>
-            </div>
-
-            ${paymentLabel ? `
-              <div class="payment-box">
-                طريقة الدفع: ${paymentLabel}
-              </div>
-            ` : ''}
-
-            <div class="products-count">
-              Products Count: ${order.items.reduce((sum, item) => sum + item.qty, 0)}
-            </div>
-
-            ${isPreview ? `
-              <div style="text-align:center;color:#e67e22;font-size:16px;font-weight:bold;margin-top:6px;background:#fff3e0;padding:4px;border-radius:4px;border:2px solid #e67e22;">
-                ⚠️ هذه معاينة فقط - غير مدفوعة
-              </div>
-            ` : ''}
-          </div>
-
-          <div class="footer">
-            ${footer}
-          </div>
-
-          <script>
-            window.onload = function() {
-              window.print();
-              setTimeout(function() { window.close(); }, 600);
-            };
-          </script>
-        </body>
-      </html>
-    `;
-  };
-
-  // ============================================
   // ✅ رقم مؤقت وفريد لأي طلب لم يُدفع بعد
   // (مبني على وقت إنشاء الطلب النشط، يبقى ثابتًا لو
   //  فتحت المعاينة أكثر من مرة، ومختلف بين الطلبات)
@@ -563,25 +349,6 @@ export function PosScreen() {
     setPrintSuccess(true);
     setTimeout(() => setPrintSuccess(false), 3000);
     setKitchenPreviewOrder(null);
-  };
-
-  // ============================================
-  // ✅ معالج طباعة فاتورة العميل
-  // ============================================
-  const handlePrintReceipt = () => {
-    if (!lastOrder) {
-      setPrintError('لا توجد فاتورة للطباعة');
-      return;
-    }
-    const content = printReceiptHTML(lastOrder);
-    const printWindow = window.open('', '_blank', 'width=400,height=600,menubar=no,toolbar=no,location=no,status=no');
-    if (printWindow) {
-      printWindow.document.write(content);
-      printWindow.document.close();
-      printWindow.focus();
-    } else {
-      setPrintError('الرجاء السماح للنوافذ المنبثقة');
-    }
   };
 
   const processRefund = () => {
@@ -635,7 +402,7 @@ export function PosScreen() {
               label="طباعة" 
               onClick={() => {
                 if (lastOrder) {
-                  handlePrintReceipt();
+                  setReceiptOpen(true);
                 } else if (cart.length > 0) {
                   const tempOrder: Order = {
                     id: 'temp',
@@ -657,7 +424,7 @@ export function PosScreen() {
                     status: 'preview',
                   };
                   setLastOrder(tempOrder);
-                  handlePrintReceipt();
+                  setReceiptOpen(true);
                 } else {
                   setPrintError('لا توجد منتجات للطباعة');
                 }
@@ -1061,7 +828,6 @@ export function PosScreen() {
         <Receipt
           order={lastOrder}
           onClose={() => setReceiptOpen(false)}
-          onPrint={handlePrintReceipt}
           isPreview={lastOrder.status === 'preview'}
         />
       )}
