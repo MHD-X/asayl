@@ -528,194 +528,178 @@ export function PosScreen() {
   // ✅ دالة طباعة تذكرة المطبخ (معدلة بالكامل)
   // ============================================
   const printKitchenTicket = (order: Order) => {
-  if (!order || !order.items || order.items.length === 0) {
-    setKitchenError('لا توجد منتجات للطباعة');
-    return;
-  }
+    if (!order || !order.items || order.items.length === 0) {
+      setKitchenError('لا توجد منتجات للطباعة');
+      return;
+    }
 
-  // ✅ حساب طول الورق بناءً على عدد الأصناف
-  const itemsCount = order.items.length;
-  const lineHeight = 28;
-  const headerHeight = 140;
-  const footerHeight = 100;
-  const totalHeight = headerHeight + (itemsCount * lineHeight) + footerHeight;
-  const paperHeight = Math.max(300, totalHeight);
+    const itemsCount = order.items.length;
+    const lineHeight = 28;
+    const headerHeight = 140;
+    const footerHeight = 100;
+    const totalHeight = headerHeight + (itemsCount * lineHeight) + footerHeight;
+    const paperHeight = Math.max(300, totalHeight);
 
-  const ticketHTML = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>تذكرة مطبخ #${order.number}</title>
-        <style>
-          /* ✅ إعدادات الصفحة */
-         @page {
-                  size: 80mm auto;           /* ✅ عرض ثابت + طول تلقائي */
-                  margin: 0;
-                  padding: 0;
-                  orientation: portrait;     /* ✅ فرض العمودي */
-              }
-          
-          /* ✅ إعادة تعيين جميع الهوامش */
-          * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-          }
-          
-          /* ✅ جسم الصفحة */
-          html, body {
-            width: 80mm;
-            height: ${paperHeight}px;
-            margin: 0;
-            padding: 0;
-            background: white;
-          }
-          
-          body {
-            width: 80mm;
-            height: ${paperHeight}px;
-            margin: 0;
-            padding: 5mm 4mm;
-            font-family: 'Courier New', monospace;
-            font-size: 13px;
-            line-height: 1.5;
-            direction: rtl;
-            background: white;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-          }
-          
-          .header {
-            text-align: center;
-            border-bottom: 3px solid #000;
-            padding-bottom: 8px;
-            margin-bottom: 10px;
-          }
-          
-          .title {
-            font-size: 22px;
-            font-weight: bold;
-          }
-          
-          .sub {
-            font-size: 13px;
-            margin: 3px 0;
-          }
-          
-          table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 6px 0;
-          }
-          
-          td {
-            padding: 6px 0;
-            border-bottom: 1px dotted #999;
-            font-size: 14px;
-          }
-          
-          .right { text-align: right; }
-          .center { text-align: center; }
-          
-          .footer {
-            border-top: 3px solid #000;
-            margin-top: 10px;
-            padding-top: 10px;
-            text-align: center;
-            font-size: 13px;
-          }
-          
-          .note {
-            color: #e67e22;
-            font-size: 12px;
-            margin: 4px 0;
-            padding: 4px;
-            border: 1px dashed #e67e22;
-            border-radius: 4px;
-          }
-
-          /* ✅ إعدادات الطباعة */
-          @media print {
+    const ticketHTML = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>تذكرة مطبخ #${order.number}</title>
+          <style>
+            @page {
+              size: 80mm ${paperHeight}px;
+              margin: 0;
+              padding: 2mm;
+              orientation: portrait;
+            }
+            * {
+              margin: 0;
+              padding: 0;
+              box-sizing: border-box;
+            }
             html, body {
               width: 80mm;
               height: ${paperHeight}px;
               margin: 0;
               padding: 0;
+              background: white;
             }
             body {
-              padding: 5mm 4mm;
+              width: 80mm;
               height: ${paperHeight}px;
+              margin: 0;
+              padding: 5mm 4mm;
+              font-family: 'Courier New', monospace;
+              font-size: 13px;
+              line-height: 1.5;
+              direction: rtl;
+              background: white;
+              display: flex;
+              flex-direction: column;
+              justify-content: space-between;
             }
-            .no-print {
-              display: none !important;
+            .header {
+              text-align: center;
+              border-bottom: 3px solid #000;
+              padding-bottom: 8px;
+              margin-bottom: 10px;
             }
-          }
-        </style>
-      </head>
-      <body>
-        <div>
-          <div class="header">
-            <div class="title">🍽️ تذكرة مطبخ</div>
-            <div class="sub">طلب #${order.number}</div>
-            <div class="sub">${new Date(order.createdAt).toLocaleTimeString('ar-EG')}</div>
-            ${order.tableLabel ? `<div class="sub">طاولة: ${order.tableLabel}</div>` : ''}
-            ${order.type === 'delivery' ? `<div class="sub">📍 توصيل</div>` : ''}
-            ${order.type === 'dine-in' ? `<div class="sub">🏠 صالة</div>` : ''}
-            ${order.type === 'takeaway' ? `<div class="sub">🛍️ سفري</div>` : ''}
+            .title {
+              font-size: 22px;
+              font-weight: bold;
+            }
+            .sub {
+              font-size: 13px;
+              margin: 3px 0;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin: 6px 0;
+            }
+            td {
+              padding: 6px 0;
+              border-bottom: 1px dotted #999;
+              font-size: 14px;
+            }
+            .right { text-align: right; }
+            .center { text-align: center; }
+            .footer {
+              border-top: 3px solid #000;
+              margin-top: 10px;
+              padding-top: 10px;
+              text-align: center;
+              font-size: 13px;
+            }
+            .note {
+              color: #e67e22;
+              font-size: 12px;
+              margin: 4px 0;
+              padding: 4px;
+              border: 1px dashed #e67e22;
+              border-radius: 4px;
+            }
+            @media print {
+              html, body {
+                width: 80mm;
+                height: ${paperHeight}px;
+                margin: 0;
+                padding: 0;
+              }
+              body {
+                padding: 5mm 4mm;
+                height: ${paperHeight}px;
+              }
+              .no-print {
+                display: none !important;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div>
+            <div class="header">
+              <div class="title">🍽️ تذكرة مطبخ</div>
+              <div class="sub">طلب #${order.number}</div>
+              <div class="sub">${new Date(order.createdAt).toLocaleTimeString('ar-EG')}</div>
+              ${order.tableLabel ? `<div class="sub">طاولة: ${order.tableLabel}</div>` : ''}
+              ${order.type === 'delivery' ? `<div class="sub">📍 توصيل</div>` : ''}
+              ${order.type === 'dine-in' ? `<div class="sub">🏠 صالة</div>` : ''}
+              ${order.type === 'takeaway' ? `<div class="sub">🛍️ سفري</div>` : ''}
+            </div>
+
+            <table>
+              <tr>
+                <td class="right"><strong>المنتج</strong></td>
+                <td class="center"><strong>الكمية</strong></td>
+              </tr>
+              ${order.items.map(item => `
+                <tr>
+                  <td class="right">${item.name}</td>
+                  <td class="center">${item.qty}</td>
+                </tr>
+                ${item.note ? `<tr><td colspan="2" class="note">📝 ${item.note}</td></tr>` : ''}
+              `).join('')}
+            </table>
           </div>
 
-          <table>
-            <tr>
-              <td class="right"><strong>المنتج</strong></td>
-              <td class="center"><strong>الكمية</strong></td>
-            </tr>
-            ${order.items.map(item => `
-              <tr>
-                <td class="right">${item.name}</td>
-                <td class="center">${item.qty}</td>
-              </tr>
-              ${item.note ? `<tr><td colspan="2" class="note">📝 ${item.note}</td></tr>` : ''}
-            `).join('')}
-          </table>
-        </div>
+          <div class="footer">
+            ${order.deliveryFee > 0 ? `رسوم التوصيل: ${order.deliveryFee.toFixed(2)} ر.س<br>` : ''}
+            وقت التجهيز: 15 دقيقة
+          </div>
 
-        <div class="footer">
-          ${order.deliveryFee > 0 ? `رسوم التوصيل: ${order.deliveryFee.toFixed(2)} ر.س<br>` : ''}
-          وقت التجهيز: 15 دقيقة
-        </div>
-
-        <script>
-          (function() {
-            window.onload = function() {
-              setTimeout(function() {
-                window.print();
+          <script>
+            (function() {
+              window.onload = function() {
                 setTimeout(function() {
-                  window.close();
-                }, 500);
-              }, 300);
-            };
-          })();
-        </script>
-      </body>
-    </html>
-  `;
+                  window.print();
+                  setTimeout(function() {
+                    window.close();
+                  }, 500);
+                }, 300);
+              };
+            })();
+          </script>
+        </body>
+      </html>
+    `;
 
-  const printWindow = window.open('', '_blank', 'width=400,height=600,menubar=no,toolbar=no,location=no,status=no');
-  if (printWindow) {
-    printWindow.document.write(ticketHTML);
-    printWindow.document.close();
-    printWindow.focus();
+    const printWindow = window.open('', '_blank', 'width=400,height=600,menubar=no,toolbar=no,location=no,status=no');
+    if (printWindow) {
+      printWindow.document.write(ticketHTML);
+      printWindow.document.close();
+      printWindow.focus();
 
-    if (currentOrderId) updateCurrentOrder({ status: 'sent' });
-    setPrintSuccess(true);
-    setTimeout(() => setPrintSuccess(false), 3000);
-    setKitchenPreviewOrder(null);
-  } else {
-    setKitchenError('الرجاء السماح للنوافذ المنبثقة');
-  }
-};
+      if (currentOrderId) updateCurrentOrder({ status: 'sent' });
+      setPrintSuccess(true);
+      setTimeout(() => setPrintSuccess(false), 3000);
+      setKitchenPreviewOrder(null);
+    } else {
+      setKitchenError('الرجاء السماح للنوافذ المنبثقة');
+    }
+  };
+
   // ============================================
   // ✅ معالج الطباعة الرئيسي
   // ============================================
@@ -739,7 +723,6 @@ export function PosScreen() {
   // ✅ معالج طباعة المطبخ (معدل)
   // ============================================
   const handlePrintKitchen = () => {
-    // ✅ بناء الطلب مباشرةً من lastOrder أو cart
     const orderToPrint = lastOrder ?? (cart.length > 0 ? {
       id: 'temp',
       number: lastOrder?.number ?? 0,
@@ -765,7 +748,6 @@ export function PosScreen() {
       return;
     }
 
-    // ✅ طباعة مباشرة دون استخدام State وسيط
     printKitchenTicket(orderToPrint);
   };
 
@@ -795,19 +777,20 @@ export function PosScreen() {
   return (
     <div className="flex h-full" dir="rtl">
       <div className="flex-1 flex flex-col bg-gray-50">
-        <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <div className="relative flex-1 max-w-xs">
-              <Search size={18} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        {/* ✅ شريط الأدوات العلوي - متجاوب */}
+        <div className="bg-white border-b border-gray-200 px-2 sm:px-4 py-2 sm:py-3 flex items-center gap-1 sm:gap-2 flex-wrap">
+          <div className="flex items-center gap-1 sm:gap-2 flex-1 min-w-0">
+            <div className="relative flex-1 max-w-[120px] sm:max-w-xs">
+              <Search size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400" />
               <Input
-                placeholder="بحث عن منتج..."
+                placeholder="بحث..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pr-10"
+                className="pr-7 text-sm h-8 sm:h-10"
               />
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
             <TopButton icon={FilePlus} label="طلب جديد" variant="primary" onClick={() => newOrder()} />
             <TopButton
               icon={Layers}
@@ -875,7 +858,8 @@ export function PosScreen() {
           </div>
         )}
 
-        <div className="bg-white border-b border-gray-200 px-4 py-2.5 flex items-center gap-2">
+        {/* ✅ أزرار نوع الطلب - متجاوبة */}
+        <div className="bg-white border-b border-gray-200 px-2 sm:px-4 py-1.5 sm:py-2.5 flex items-center gap-1 sm:gap-2 flex-wrap">
           <OrderTypeButton active={orderType === 'dine-in'} icon={Utensils} label={ORDER_TYPE_LABELS['dine-in']} onClick={() => setOrderType('dine-in')} />
           <OrderTypeButton active={orderType === 'takeaway'} icon={Store} label={ORDER_TYPE_LABELS['takeaway']} onClick={() => setOrderType('takeaway')} />
           <OrderTypeButton active={orderType === 'delivery'} icon={Bike} label={ORDER_TYPE_LABELS['delivery']} onClick={() => setOrderType('delivery')} />
@@ -884,7 +868,7 @@ export function PosScreen() {
             <Select
               value={tableLabel}
               onChange={(e) => updateCurrentOrder({ tableLabel: e.target.value })}
-              className="w-40"
+              className="w-28 sm:w-40 text-sm"
             >
               <option value="">اختر الطاولة</option>
               {settings.dineInAreas.map((a) => (
@@ -896,7 +880,7 @@ export function PosScreen() {
             <Select
               value={deliveryZoneId}
               onChange={(e) => updateCurrentOrder({ deliveryZoneId: e.target.value })}
-              className="w-48"
+              className="w-32 sm:w-48 text-sm"
             >
               <option value="">اختر منطقة التوصيل</option>
               {settings.deliveryZones.map((z) => (
@@ -906,12 +890,13 @@ export function PosScreen() {
           )}
         </div>
 
-        <div className="bg-white border-b border-gray-200 px-4 py-2 flex gap-2 overflow-x-auto no-scrollbar">
+        {/* ✅ تبويبات الفئات - متجاوبة */}
+        <div className="bg-white border-b border-gray-200 px-2 sm:px-4 py-1.5 sm:py-2 flex gap-1 sm:gap-2 overflow-x-auto no-scrollbar">
           {settings.categories.map((cat) => (
             <button
               key={cat.id}
               onClick={() => setActiveCategoryId(cat.id)}
-              className={`px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-all ${
+              className={`px-2 sm:px-4 py-1 sm:py-2 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold whitespace-nowrap transition-all flex-shrink-0 ${
                 activeCategoryId === cat.id
                   ? 'text-white shadow-md'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -923,40 +908,41 @@ export function PosScreen() {
           ))}
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4">
+        {/* ✅ شبكة المنتجات - متجاوبة */}
+        <div className="flex-1 overflow-y-auto p-2 sm:p-4">
           {!currentOrderId ? (
             <div className="flex flex-col items-center justify-center h-full text-gray-400">
-              <ShoppingCart size={48} className="mb-3" />
-              <p className="text-sm mb-3">لا يوجد طلب نشط. اضغط "طلب جديد" للبدء.</p>
+              <ShoppingCart size={36} className="mb-3" />
+              <p className="text-xs sm:text-sm mb-3">لا يوجد طلب نشط. اضغط "طلب جديد" للبدء.</p>
               <Button onClick={() => newOrder()}>
-                <FilePlus size={18} className="inline ml-1" />
+                <FilePlus size={16} className="inline ml-1" />
                 طلب جديد
               </Button>
             </div>
           ) : filteredProducts.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-gray-400">
-              <ShoppingCart size={48} className="mb-3" />
-              <p className="text-sm">لا توجد منتجات. أضف منتجات من شاشة المنتجات.</p>
+              <ShoppingCart size={36} className="mb-3" />
+              <p className="text-xs sm:text-sm">لا توجد منتجات. أضف منتجات من شاشة المنتجات.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+            <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5 sm:gap-3">
               {filteredProducts.map((product) => {
                 const price = getProductPrice(product.prices, orderType);
                 return (
                   <button
                     key={product.id}
                     onClick={() => addToCart(product.id)}
-                    className="bg-white rounded-2xl border border-gray-200 p-3 flex flex-col items-center gap-2 hover:shadow-lg hover:border-blue-300 active:scale-95 transition-all"
+                    className="bg-white rounded-xl sm:rounded-2xl border border-gray-200 p-2 sm:p-3 flex flex-col items-center gap-1 sm:gap-2 hover:shadow-lg hover:border-blue-300 active:scale-95 transition-all"
                   >
-                    <div className="w-full aspect-square rounded-xl bg-gray-100 overflow-hidden flex items-center justify-center">
+                    <div className="w-full aspect-square rounded-lg sm:rounded-xl bg-gray-100 overflow-hidden flex items-center justify-center">
                       {product.image ? (
                         <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
                       ) : (
-                        <Utensils size={32} className="text-gray-300" />
+                        <Utensils size={20} className="text-gray-300" />
                       )}
                     </div>
-                    <p className="text-sm font-semibold text-gray-700 text-center leading-tight line-clamp-2">{product.name}</p>
-                    <p className="text-sm font-bold text-blue-600">{formatMoney(price)}</p>
+                    <p className="text-[10px] sm:text-sm font-semibold text-gray-700 text-center leading-tight line-clamp-2">{product.name}</p>
+                    <p className="text-[10px] sm:text-sm font-bold text-blue-600">{formatMoney(price)}</p>
                   </button>
                 );
               })}
@@ -965,29 +951,32 @@ export function PosScreen() {
         </div>
       </div>
 
-      <div className="w-80 lg:w-96 bg-white border-r border-gray-200 flex flex-col flex-shrink-0">
-        <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <ShoppingCart size={20} className="text-blue-600" />
-            <h3 className="font-bold text-gray-800">السلة</h3>
-            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold">
+      {/* ✅ السلة الجانبية - متجاوبة (تختفي على الشاشات الصغيرة جداً) */}
+      <div className={`w-64 sm:w-72 md:w-80 lg:w-96 bg-white border-r border-gray-200 flex flex-col flex-shrink-0 ${
+        cart.length === 0 ? 'hidden sm:flex' : 'flex'
+      }`}>
+        <div className="px-3 sm:px-4 py-2 sm:py-3 border-b border-gray-100 flex items-center justify-between">
+          <div className="flex items-center gap-1 sm:gap-2">
+            <ShoppingCart size={18} className="text-blue-600" />
+            <h3 className="font-bold text-sm sm:text-base text-gray-800">السلة</h3>
+            <span className="text-[10px] sm:text-xs bg-blue-100 text-blue-700 px-1.5 sm:px-2 py-0.5 rounded-full font-bold">
               {cart.reduce((s, i) => s + i.qty, 0)}
             </span>
             {currentOrder && (
-              <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
+              <span className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full font-semibold ${
                 currentOrder.status === 'sent' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
               }`}>
-                {currentOrder.status === 'sent' ? 'أُرسل للمطبخ' : 'مفتوح'}
+                {currentOrder.status === 'sent' ? 'أُرسل' : 'مفتوح'}
               </span>
             )}
           </div>
           {cart.length > 0 && (
             <button
               onClick={() => voidOrder()}
-              className="text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition-colors"
+              className="text-red-500 hover:bg-red-50 p-1 rounded-lg transition-colors"
               title="إلغاء الطلب"
             >
-              <Trash2 size={18} />
+              <Trash2 size={16} />
             </button>
           )}
         </div>
@@ -995,39 +984,39 @@ export function PosScreen() {
         <div className="flex-1 overflow-y-auto">
           {cart.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-gray-300">
-              <ShoppingCart size={48} className="mb-2" />
-              <p className="text-sm">السلة فارغة</p>
+              <ShoppingCart size={32} className="mb-2" />
+              <p className="text-xs sm:text-sm">السلة فارغة</p>
             </div>
           ) : (
-            <div className="p-3 space-y-2">
+            <div className="p-2 sm:p-3 space-y-1.5 sm:space-y-2">
               {cart.map((item, i) => (
-                <div key={i} className="bg-gray-50 rounded-xl p-3 animate-fade-in">
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <p className="text-sm font-semibold text-gray-800 flex-1">{item.name}</p>
-                    <button onClick={() => removeItem(i)} className="text-red-400 hover:text-red-600 p-1">
-                      <XCircle size={16} />
+                <div key={i} className="bg-gray-50 rounded-lg sm:rounded-xl p-2 sm:p-3 animate-fade-in">
+                  <div className="flex items-start justify-between gap-1 sm:gap-2 mb-1 sm:mb-2">
+                    <p className="text-xs sm:text-sm font-semibold text-gray-800 flex-1">{item.name}</p>
+                    <button onClick={() => removeItem(i)} className="text-red-400 hover:text-red-600 p-0.5">
+                      <XCircle size={14} />
                     </button>
                   </div>
                   {item.note && (
-                    <p className="text-xs text-orange-600 bg-orange-50 rounded-lg px-2 py-1 mb-2">
+                    <p className="text-[10px] sm:text-xs text-orange-600 bg-orange-50 rounded-lg px-1.5 sm:px-2 py-0.5 sm:py-1 mb-1 sm:mb-2">
                       {item.note}
                     </p>
                   )}
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => changeQty(i, -1)} className="w-8 h-8 rounded-lg bg-white border border-gray-200 flex items-center justify-center hover:bg-gray-100 active:scale-90 transition-all">
-                        <Minus size={16} className="text-gray-600" />
+                    <div className="flex items-center gap-1 sm:gap-2">
+                      <button onClick={() => changeQty(i, -1)} className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg bg-white border border-gray-200 flex items-center justify-center hover:bg-gray-100 active:scale-90 transition-all">
+                        <Minus size={12} className="text-gray-600" />
                       </button>
-                      <span className="text-sm font-bold w-8 text-center">{item.qty}</span>
-                      <button onClick={() => changeQty(i, 1)} className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 active:scale-90 transition-all">
-                        <Plus size={16} />
+                      <span className="text-xs sm:text-sm font-bold w-6 sm:w-8 text-center">{item.qty}</span>
+                      <button onClick={() => changeQty(i, 1)} className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 active:scale-90 transition-all">
+                        <Plus size={12} />
                       </button>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => openNoteForItem(i)} className="text-gray-400 hover:text-orange-500 p-1">
-                        <StickyNote size={16} />
+                    <div className="flex items-center gap-1 sm:gap-2">
+                      <button onClick={() => openNoteForItem(i)} className="text-gray-400 hover:text-orange-500 p-0.5">
+                        <StickyNote size={14} />
                       </button>
-                      <span className="text-sm font-bold text-gray-700">{formatMoney(item.price * item.qty)}</span>
+                      <span className="text-xs sm:text-sm font-bold text-gray-700">{formatMoney(item.price * item.qty)}</span>
                     </div>
                   </div>
                 </div>
@@ -1037,56 +1026,56 @@ export function PosScreen() {
         </div>
 
         {showCustomerForm && currentOrderId && (
-          <div className="border-t border-gray-100 px-4 py-3 space-y-2 bg-orange-50/50">
-            <p className="text-xs font-bold text-orange-700 flex items-center gap-1">
-              <User size={14} className="inline" />
+          <div className="border-t border-gray-100 px-3 sm:px-4 py-2 sm:py-3 space-y-1.5 sm:space-y-2 bg-orange-50/50">
+            <p className="text-[10px] sm:text-xs font-bold text-orange-700 flex items-center gap-1">
+              <User size={12} className="inline" />
               بيانات العميل
             </p>
             <Input
               placeholder="اسم العميل"
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
-              className="text-sm"
+              className="text-xs sm:text-sm h-7 sm:h-9"
             />
             <Input
               type="tel"
               placeholder="رقم الهاتف"
               value={customerPhone}
               onChange={(e) => setCustomerPhone(e.target.value)}
-              className="text-sm"
+              className="text-xs sm:text-sm h-7 sm:h-9"
             />
             <Input
               placeholder="المنطقة / العنوان"
               value={customerAddress}
               onChange={(e) => setCustomerAddress(e.target.value)}
-              className="text-sm"
+              className="text-xs sm:text-sm h-7 sm:h-9"
             />
           </div>
         )}
 
-        <div className="border-t border-gray-100 p-4 space-y-2">
-          <div className="flex justify-between text-sm text-gray-500">
+        <div className="border-t border-gray-100 p-2 sm:p-4 space-y-1 sm:space-y-2">
+          <div className="flex justify-between text-[10px] sm:text-sm text-gray-500">
             <span>المجموع الفرعي</span>
             <span className="font-semibold">{formatMoney(subtotal)}</span>
           </div>
           {orderDiscount > 0 && (
-            <div className="flex justify-between text-sm text-red-500">
+            <div className="flex justify-between text-[10px] sm:text-sm text-red-500">
               <span>الخصم</span>
               <span className="font-semibold">-{formatMoney(orderDiscount)}</span>
             </div>
           )}
           {deliveryFee > 0 && (
-            <div className="flex justify-between text-sm text-gray-500">
+            <div className="flex justify-between text-[10px] sm:text-sm text-gray-500">
               <span>رسوم التوصيل</span>
               <span className="font-semibold">{formatMoney(deliveryFee)}</span>
             </div>
           )}
-          <div className="flex justify-between items-center pt-2 border-t border-gray-100">
-            <span className="text-base font-bold text-gray-800">الإجمالي</span>
-            <span className="text-2xl font-bold text-blue-600">{formatMoney(total)}</span>
+          <div className="flex justify-between items-center pt-1 sm:pt-2 border-t border-gray-100">
+            <span className="text-xs sm:text-base font-bold text-gray-800">الإجمالي</span>
+            <span className="text-base sm:text-2xl font-bold text-blue-600">{formatMoney(total)}</span>
           </div>
-          <Button size="lg" className="w-full" disabled={cart.length === 0} onClick={() => setCheckoutOpen(true)}>
-            <CreditCard size={20} className="inline ml-2" />
+          <Button size="lg" className="w-full text-sm sm:text-base py-1.5 sm:py-2" disabled={cart.length === 0} onClick={() => setCheckoutOpen(true)}>
+            <CreditCard size={16} className="inline ml-1 sm:ml-2" />
             الدفع
           </Button>
         </div>
@@ -1254,6 +1243,7 @@ export function PosScreen() {
   );
 }
 
+// ✅ TopButton - متجاوب
 function TopButton({ icon: Icon, label, onClick, variant, disabled }: {
   icon: typeof Printer;
   label: string;
@@ -1265,7 +1255,7 @@ function TopButton({ icon: Icon, label, onClick, variant, disabled }: {
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed ${
+      className={`flex items-center gap-0.5 sm:gap-1.5 px-1.5 sm:px-3 py-1 sm:py-2 rounded-lg sm:rounded-xl text-[10px] sm:text-sm font-semibold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap ${
         variant === 'danger'
           ? 'bg-red-50 text-red-600 hover:bg-red-100'
           : variant === 'primary'
@@ -1273,12 +1263,13 @@ function TopButton({ icon: Icon, label, onClick, variant, disabled }: {
           : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
       }`}
     >
-      <Icon size={16} />
-      <span className="hidden sm:inline">{label}</span>
+      <Icon size={14} className="sm:size-16" />
+      <span className="hidden xs:inline">{label}</span>
     </button>
   );
 }
 
+// ✅ OrderTypeButton - متجاوب
 function OrderTypeButton({ active, icon: Icon, label, onClick }: {
   active: boolean;
   icon: typeof Utensils;
@@ -1288,12 +1279,12 @@ function OrderTypeButton({ active, icon: Icon, label, onClick }: {
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all active:scale-95 ${
+      className={`flex items-center gap-1 sm:gap-2 px-1.5 sm:px-4 py-1 sm:py-2 rounded-lg sm:rounded-xl text-[10px] sm:text-sm font-bold transition-all active:scale-95 whitespace-nowrap ${
         active ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
       }`}
     >
-      <Icon size={18} />
-      {label}
+      <Icon size={14} className="sm:size-18" />
+      <span className="hidden xs:inline">{label}</span>
     </button>
   );
 }
