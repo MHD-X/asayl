@@ -7,11 +7,13 @@ import { Printer, X } from 'lucide-react';
 interface KitchenTicketProps {
   order: Order;
   onClose: () => void;
+  onPrinted: () => void; // يُستدعى بعد إرسال أمر الطباعة: لتحديث حالة الطلب وإغلاق المعاينة
 }
 
-export function KitchenTicket({ order, onClose }: KitchenTicketProps) {
+export function KitchenTicket({ order, onClose, onPrinted }: KitchenTicketProps) {
   const handlePrint = () => {
     window.print();
+    onPrinted();
   };
 
   return (
@@ -45,7 +47,6 @@ export function KitchenTicket({ order, onClose }: KitchenTicketProps) {
             <p className="text-xs text-gray-500 mt-0.5">{formatDateTime(order.createdAt)}</p>
           </div>
 
-          {/* Customer details for delivery/talabat orders */}
           {order.customer && (order.customer.name || order.customer.phone || order.customer.address) && (
             <div className="border-t border-dashed border-gray-400 pt-1.5 mb-1.5 space-y-0.5 text-xs">
               {order.customer.name && (
@@ -87,6 +88,12 @@ export function KitchenTicket({ order, onClose }: KitchenTicketProps) {
               </div>
             ))}
           </div>
+
+          {order.deliveryFee > 0 && (
+            <div className="text-center border-t border-dashed border-gray-400 pt-2 mt-1 text-xs">
+              رسوم التوصيل: {order.deliveryFee.toFixed(2)} ر.س
+            </div>
+          )}
         </div>
       </div>
     </Modal>
