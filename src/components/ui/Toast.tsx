@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, CheckCircle, AlertCircle, Info, AlertTriangle } from 'lucide-react';
 
 type ToastType = 'success' | 'error' | 'info' | 'warning';
@@ -41,7 +41,6 @@ export function Toast({ message, type = 'info', duration = 3000, onClose }: Toas
   );
 }
 
-// ✅ Context للتحكم في الإشعارات من أي مكان
 interface ToastContextType {
   showToast: (message: string, type?: ToastType, duration?: number) => void;
 }
@@ -73,7 +72,6 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ✅ Hook لاستخدام الإشعارات
 export function useToast() {
   const context = React.useContext(ToastContext);
   if (!context) throw new Error('useToast must be used within ToastProvider');
