@@ -1108,10 +1108,11 @@ const onKitchenTicketPrinted = () => {
         />
       )}
 
-      {kitchenPreviewOrder && (
+            {kitchenPreviewOrder && (
         <KitchenTicket
           order={kitchenPreviewOrder}
           onClose={() => setKitchenPreviewOrder(null)}
+          onPrinted={onKitchenTicketPrinted}
         />
       )}
     </div>
