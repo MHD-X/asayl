@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { View } from '@/types';
 import { SettingsProvider } from '@/context/SettingsContext';
+import { ToastProvider } from '@/components/ui/Toast';
 import { Sidebar } from '@/components/Sidebar';
 import { PosScreen } from '@/components/screens/PosScreen';
 import { ProductsScreen } from '@/components/screens/ProductsScreen';
@@ -22,25 +23,27 @@ function App() {
 
   return (
     <SettingsProvider>
-      <div className="flex h-screen overflow-hidden bg-gray-100">
-        <Sidebar view={view} onNavigate={setView} />
-        <main className="flex-1 overflow-hidden">
-          {view === 'pos' && <PosScreen />}
-          {view === 'products' && <ProductsScreen />}
-          {view === 'modifiers' && <ModifiersScreen />}
-          {view === 'branding' && <BrandingScreen />}
-          {view === 'delivery' && <DeliveryScreen />}
-          {view === 'printers' && <PrintersScreen />}
-          {view === 'receipt-settings' && <ReceiptSettingsScreen />}
-          {view === 'finance' && <FinanceScreen />}
-          {view === 'tags' && <TagsScreen />}
-          {view === 'users' && <UsersScreen />}
-          {view === 'shifts' && <ShiftsScreen />}
-          {view === 'reports' && <ReportsScreen />}
-          {view === 'audit' && <AuditLogScreen />}
-          {view === 'backup' && <BackupScreen />}
-        </main>
-      </div>
+      <ToastProvider>
+        <div className="flex h-screen overflow-hidden bg-gray-100">
+          <Sidebar view={view} onNavigate={setView} />
+          <main className="flex-1 overflow-hidden">
+            {view === 'pos' && <PosScreen />}
+            {view === 'products' && <ProductsScreen />}
+            {view === 'modifiers' && <ModifiersScreen />}
+            {view === 'branding' && <BrandingScreen />}
+            {view === 'delivery' && <DeliveryScreen />}
+            {view === 'printers' && <PrintersScreen />}
+            {view === 'receipt-settings' && <ReceiptSettingsScreen />}
+            {view === 'finance' && <FinanceScreen />}
+            {view === 'tags' && <TagsScreen />}
+            {view === 'users' && <UsersScreen />}
+            {view === 'shifts' && <ShiftsScreen />}
+            {view === 'reports' && <ReportsScreen />}
+            {view === 'audit' && <AuditLogScreen />}
+            {view === 'backup' && <BackupScreen />}
+          </main>
+        </div>
+      </ToastProvider>
     </SettingsProvider>
   );
 }
