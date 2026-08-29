@@ -64,25 +64,23 @@ input[type="number"] {
    🖨️ إعدادات الطباعة للفاتورة الحرارية 80mm
    ============================================ */
 @media print {
-  /* ✅ إخفاء كل العناصر غير المرغوب فيها */
+  /* ✅ إخفاء العناصر غير المرغوب فيها */
   .no-print,
   .modal-backdrop,
   .modal-header,
   .modal-footer,
-  /* ✅ تم إزالة modal-overlay من هنا */
+  /* ✅ تم حذف modal-overlay من هنا */
   button:not(.print-btn),
   .print-wrapper > *:not(.print-area) {
     display: none !important;
   }
 
-  /* ✅ إعدادات الصفحة */
   @page {
     size: 80mm auto;
     margin: 0;
     padding: 0;
   }
 
-  /* ✅ إعدادات الجسم */
   body {
     width: 80mm;
     margin: 0;
@@ -92,7 +90,6 @@ input[type="number"] {
     line-height: 1.4;
   }
 
-  /* ✅ منطقة الطباعة */
   .print-area {
     width: 80mm !important;
     max-width: 80mm !important;
@@ -109,13 +106,11 @@ input[type="number"] {
     font-family: 'Courier New', monospace;
   }
 
-  /* ✅ إظهار محتويات منطقة الطباعة فقط */
   .print-area,
   .print-area * {
     visibility: visible !important;
   }
 
-  /* ✅ إخفاء كل شيء آخر */
   body * {
     visibility: hidden !important;
   }
@@ -125,7 +120,6 @@ input[type="number"] {
     visibility: visible !important;
   }
 
-  /* ✅ إعادة تعيين حاوية المودال */
   .modal-container {
     position: static !important;
     background: transparent !important;
@@ -144,7 +138,7 @@ input[type="number"] {
     position: static !important;
     background: transparent !important;
     padding: 0 !important;
-    /* ✅ display غير موجودة هنا، لذلك سيتم تطبيق القيمة الافتراضية (block) */
+    /* ✅ display غير محددة، فتظهر بشكل طبيعي */
   }
 
   .print-wrapper {
@@ -152,19 +146,16 @@ input[type="number"] {
     position: static !important;
   }
 
-  /* ✅ منع تقسيم المحتوى بين صفحات */
   .print-area * {
     page-break-inside: avoid;
     page-break-after: avoid;
   }
 
-  /* ✅ منع ظهور أي خلفيات أو ألوان إضافية */
   .print-area .bg-gray-50,
   .print-area .bg-gray-100 {
     background: white !important;
   }
 
-  /* ✅ تنسيق الجداول */
   .print-area table {
     width: 100%;
     border-collapse: collapse;
@@ -176,7 +167,6 @@ input[type="number"] {
     font-size: 10px;
   }
 
-  /* ✅ تنسيق الخطوط */
   .print-area .font-bold {
     font-weight: 700 !important;
   }
@@ -197,7 +187,6 @@ input[type="number"] {
     font-size: 13px !important;
   }
 
-  /* ✅ تنسيق الحدود */
   .print-area .border-t {
     border-top: 1px dashed #999 !important;
   }
