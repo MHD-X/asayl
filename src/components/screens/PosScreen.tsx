@@ -3,7 +3,6 @@ import { useSettings } from '@/context/SettingsContext';
 import type { CartItem, OrderType, PaymentMethod, Order, ActiveOrder, CustomerInfo } from '@/types';
 import { ORDER_TYPE_LABELS } from '@/types';
 import { uid, formatMoney, getProductPrice, addAuditEntry } from '@/utils/storage';
-import { browserPrint } from '@/utils/printer';
 import {
   Printer, ChefHat, XCircle, Percent, StickyNote, Tag, MoreHorizontal,
   Search, Plus, Minus, Trash2, ShoppingCart, CreditCard,
@@ -303,6 +302,9 @@ export function PosScreen() {
 
   // ============================================
   // ✅ دالة طباعة فاتورة العميل
+  // (مصححة: @page الآن "80mm auto" بدون خلط وحدات
+  //  mm/px، فالورق يطول أو يقصر تلقائيًا حسب المحتوى
+  //  بدل ارتفاع ثابت كان يسبب طباعة بالعرض أحيانًا)
   // ============================================
   const printReceiptHTML = (order: Order) => {
     const receiptSettings = settings.receiptSettings;
@@ -312,13 +314,6 @@ export function PosScreen() {
     const footer = receiptSettings.footer || 'شكراً لزيارتكم 🤍';
     const currency = receiptSettings.currency || 'ر.س';
     const isPreview = order.status === 'preview';
-
-    const itemsCount = order.items.length;
-    const lineHeight = 28;
-    const headerHeight = 220;
-    const footerHeight = 160;
-    const totalHeight = headerHeight + (itemsCount * lineHeight) + footerHeight;
-    const paperHeight = Math.max(450, totalHeight);
 
     const paymentMethodLabels: Record<string, string> = {
       cash: '💵 نقدي',
@@ -338,21 +333,16 @@ export function PosScreen() {
           <meta charset="UTF-8">
           <title>فاتورة #${order.number}</title>
           <style>
-            @page { size: 80mm ${paperHeight}px; margin: 0; padding: 2mm; }
+            @page { size: 80mm auto; margin: 0; }
             * { margin: 0; padding: 0; box-sizing: border-box; }
+            html, body { width: 80mm; background: white; }
             body {
-              width: 80mm;
-              height: ${paperHeight}px;
-              margin: 0;
               padding: 5mm 4mm;
               font-family: 'Courier New', monospace;
               font-size: 10px;
               line-height: 1.3;
               direction: rtl;
               background: white;
-              display: flex;
-              flex-direction: column;
-              justify-content: center;
             }
             .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 6px; margin-bottom: 6px; }
             .title { font-size: 16px; font-weight: bold; }
@@ -523,60 +513,60 @@ export function PosScreen() {
       </html>
     `;
   };
-///////////////////////////////////////////
-  // ============================================
-// ✅ رقم مؤقت وفريد لأي طلب لم يُدفع بعد بعد
-// (مبني على وقت إنشاء الطلب النشط، يبقى ثابتًا لو
-//  فتحت المعاينة أكثر من مرة، ومختلف بين الطلبات)
-// ============================================
-const getPreviewNumber = (activeOrder: { createdAt: string }) => {
-  return Number(new Date(activeOrder.createdAt).getTime().toString().slice(-4));
-};
-
-// ============================================
-// ✅ معالج فتح معاينة تذكرة المطبخ
-// ============================================
-const handlePrintKitchen = () => {
-  const orderToPreview: Order | null = lastOrder ?? (currentOrder && cart.length > 0 ? {
-    id: 'temp',
-    number: getPreviewNumber(currentOrder),
-    type: orderType,
-    tableLabel: tableLabel || undefined,
-    deliveryZoneId: deliveryZoneId || undefined,
-    deliveryFee: deliveryFee || 0,
-    items: cart.map(item => ({ ...item })),
-    subtotal: subtotal || 0,
-    serviceCharge: 0,
-    tax: 0,
-    discount: orderDiscount || 0,
-    total: 0,
-    paymentMethod: 'cash' as PaymentMethod,
-    cashierName: settings.cashierName || 'كاشير',
-    createdAt: currentOrder.createdAt,
-    tagIds: orderTagIds || [],
-    status: 'open' as const,
-  } : null);
-
-  if (!orderToPreview) {
-    setKitchenError('لا توجد طلبات للطباعة');
-    return;
-  }
-
-  setKitchenPreviewOrder(orderToPreview);
-};
-
-// ============================================
-// ✅ يُستدعى من KitchenTicket بعد الضغط على "طباعة"
-// ============================================
-const onKitchenTicketPrinted = () => {
-  if (currentOrderId) updateCurrentOrder({ status: 'sent' });
-  setPrintSuccess(true);
-  setTimeout(() => setPrintSuccess(false), 3000);
-  setKitchenPreviewOrder(null);
-};
 
   // ============================================
-  // ✅ معالج الطباعة الرئيسي
+  // ✅ رقم مؤقت وفريد لأي طلب لم يُدفع بعد
+  // (مبني على وقت إنشاء الطلب النشط، يبقى ثابتًا لو
+  //  فتحت المعاينة أكثر من مرة، ومختلف بين الطلبات)
+  // ============================================
+  const getPreviewNumber = (activeOrder: { createdAt: string }) => {
+    return Number(new Date(activeOrder.createdAt).getTime().toString().slice(-4));
+  };
+
+  // ============================================
+  // ✅ معالج فتح معاينة تذكرة المطبخ
+  // ============================================
+  const handlePrintKitchen = () => {
+    const orderToPreview: Order | null = lastOrder ?? (currentOrder && cart.length > 0 ? {
+      id: 'temp',
+      number: getPreviewNumber(currentOrder),
+      type: orderType,
+      tableLabel: tableLabel || undefined,
+      deliveryZoneId: deliveryZoneId || undefined,
+      deliveryFee: deliveryFee || 0,
+      items: cart.map(item => ({ ...item })),
+      subtotal: subtotal || 0,
+      serviceCharge: 0,
+      tax: 0,
+      discount: orderDiscount || 0,
+      total: 0,
+      paymentMethod: 'cash' as PaymentMethod,
+      cashierName: settings.cashierName || 'كاشير',
+      createdAt: currentOrder.createdAt,
+      tagIds: orderTagIds || [],
+      status: 'open' as const,
+    } : null);
+
+    if (!orderToPreview) {
+      setKitchenError('لا توجد طلبات للطباعة');
+      return;
+    }
+
+    setKitchenPreviewOrder(orderToPreview);
+  };
+
+  // ============================================
+  // ✅ يُستدعى من KitchenTicket بعد الضغط على "طباعة"
+  // ============================================
+  const onKitchenTicketPrinted = () => {
+    if (currentOrderId) updateCurrentOrder({ status: 'sent' });
+    setPrintSuccess(true);
+    setTimeout(() => setPrintSuccess(false), 3000);
+    setKitchenPreviewOrder(null);
+  };
+
+  // ============================================
+  // ✅ معالج طباعة فاتورة العميل
   // ============================================
   const handlePrintReceipt = () => {
     if (!lastOrder) {
@@ -592,38 +582,6 @@ const onKitchenTicketPrinted = () => {
     } else {
       setPrintError('الرجاء السماح للنوافذ المنبثقة');
     }
-  };
-
-  // ============================================
-  // ✅ معالج طباعة المطبخ (معدل)
-  // ============================================
-  const handlePrintKitchen = () => {
-    const orderToPrint = lastOrder ?? (cart.length > 0 ? {
-      id: 'temp',
-      number: lastOrder?.number ?? 0,
-      type: orderType,
-      tableLabel: tableLabel || '',
-      deliveryZoneId: deliveryZoneId || '',
-      deliveryFee: deliveryFee || 0,
-      items: cart.map(item => ({ ...item })),
-      subtotal: subtotal || 0,
-      serviceCharge: 0,
-      tax: 0,
-      discount: orderDiscount || 0,
-      total: 0,
-      paymentMethod: 'cash' as PaymentMethod,
-      cashierName: settings.cashierName || 'كاشير',
-      createdAt: new Date().toISOString(),
-      tagIds: orderTagIds || [],
-      status: 'open' as const,
-    } : null);
-
-    if (!orderToPrint) {
-      setKitchenError('لا توجد طلبات للطباعة');
-      return;
-    }
-
-    printKitchenTicket(orderToPrint);
   };
 
   const processRefund = () => {
@@ -1108,7 +1066,7 @@ const onKitchenTicketPrinted = () => {
         />
       )}
 
-            {kitchenPreviewOrder && (
+      {kitchenPreviewOrder && (
         <KitchenTicket
           order={kitchenPreviewOrder}
           onClose={() => setKitchenPreviewOrder(null)}
