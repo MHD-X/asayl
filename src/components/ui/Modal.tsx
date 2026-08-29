@@ -112,11 +112,19 @@ export function Field({ label, children }: FieldProps) {
   );
 }
 
+// ✅ Input المعدل - يدعم الأرقام مع RTL
 export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
+  // ✅ إذا كان النوع number، نستخدم text مع inputMode numeric
+  const isNumber = props.type === 'number';
+  const inputType = isNumber ? 'text' : props.type;
+  const inputMode = isNumber ? 'decimal' : undefined;
+
   return (
     <input
       {...props}
-      className={`w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${props.className ?? ''}`}
+      type={inputType}
+      inputMode={inputMode}
+      className={`w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-right ${props.className ?? ''}`}
     />
   );
 }
