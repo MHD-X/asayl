@@ -22,8 +22,6 @@ import {
   Menu,
   X,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -31,7 +29,6 @@ interface SidebarProps {
   onNavigate: (v: View) => void;
 }
 
-// ✅ مجموعات القوائم (مع قوائم فرعية)
 interface NavGroup {
   label: string;
   icon: typeof ShoppingCart;
@@ -73,7 +70,6 @@ const navGroups: NavGroup[] = [
   },
 ];
 
-// ✅ عنصر القائمة الرئيسي (للأيقونات فقط عند الطي)
 const NavItem = ({ 
   item, 
   active, 
@@ -91,8 +87,8 @@ const NavItem = ({
       onClick={onClick}
       className={`w-full flex items-center gap-3 px-4 py-3 transition-all duration-150 group relative rounded-xl ${
         active
-          ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
-          : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+          ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/50'
+          : 'text-gray-300 hover:bg-slate-800 hover:text-white'
       }`}
       title={collapsed ? item.label : undefined}
     >
@@ -109,7 +105,6 @@ const NavItem = ({
   );
 };
 
-// ✅ مجموعة قوائم منسدلة (مع إمكانية الطي)
 const NavGroupItem = ({ 
   group, 
   view, 
@@ -123,26 +118,21 @@ const NavGroupItem = ({
 }) => {
   const [isOpen, setIsOpen] = useState(true);
   const Icon = group.icon;
-
-  // التحقق من وجود عنصر نشط في المجموعة
   const hasActive = group.items.some(item => item.id === view);
 
   if (collapsed) {
-    // ✅ وضع الطي: عرض الأيقونة فقط مع Tooltip
     return (
       <div className="relative group">
         <button
           onClick={() => {
-            // عند الطي، افتح أول عنصر في المجموعة
             const firstItem = group.items[0];
             if (firstItem) onNavigate(firstItem.id);
           }}
-          className="w-full flex items-center justify-center px-4 py-3 transition-all duration-150 rounded-xl text-slate-400 hover:bg-slate-800 hover:text-white"
+          className="w-full flex items-center justify-center px-4 py-3 transition-all duration-150 rounded-xl text-gray-300 hover:bg-slate-800 hover:text-white"
           title={group.label}
         >
           <Icon size={22} className="flex-shrink-0" />
         </button>
-        {/* Tooltip عند التمرير */}
         <div className="absolute right-full top-1/2 -translate-y-1/2 mr-2 px-2 py-1 bg-slate-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
           {group.label}
         </div>
@@ -152,13 +142,12 @@ const NavGroupItem = ({
 
   return (
     <div className="mb-1">
-      {/* زر المجموعة الرئيسي */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={`w-full flex items-center gap-3 px-4 py-3 transition-all duration-150 rounded-xl ${
           hasActive
             ? 'text-blue-400 bg-blue-600/10'
-            : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+            : 'text-gray-300 hover:bg-slate-800 hover:text-white'
         }`}
       >
         <Icon size={22} className="flex-shrink-0" />
@@ -169,7 +158,6 @@ const NavGroupItem = ({
         />
       </button>
 
-      {/* العناصر الفرعية */}
       <div className={`mr-4 overflow-hidden transition-all duration-200 ${
         isOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
       }`}>
@@ -199,23 +187,23 @@ export function Sidebar({ view, onNavigate }: SidebarProps) {
 
   return (
     <>
-      {/* ✅ زر القائمة للجوال - يظهر فقط على الشاشات الصغيرة */}
+      {/* زر القائمة للجوال - يظهر على الشاشات الصغيرة */}
       <button
         onClick={() => setMobileOpen(true)}
-        className="lg:hidden fixed top-4 right-4 z-50 w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-xl hover:bg-slate-800 active:scale-95 transition-all duration-200 border border-slate-700"
+        className="lg:hidden fixed top-4 left-4 z-50 w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-xl hover:bg-slate-800 active:scale-95 transition-all duration-200 border border-slate-700"
         aria-label="فتح القائمة"
       >
         <Menu size={24} />
       </button>
 
-      {/* ✅ قائمة الجوال (Drawer) */}
+      {/* قائمة الجوال (Drawer) */}
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
           <div
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setMobileOpen(false)}
           />
-          <aside className="relative w-[280px] bg-slate-900 text-white flex flex-col flex-shrink-0 h-full animate-slide-up shadow-2xl">
+          <aside className="relative w-[280px] bg-slate-900 text-white flex flex-col flex-shrink-0 h-full animate-slide-up shadow-2xl mx-2 rounded-2xl">
             {/* رأس القائمة */}
             <div className="flex items-center justify-between px-4 py-4 border-b border-slate-800">
               <div className="flex items-center gap-3">
@@ -260,7 +248,7 @@ export function Sidebar({ view, onNavigate }: SidebarProps) {
         </div>
       )}
 
-      {/* ✅ القائمة الجانبية لسطح المكتب */}
+      {/* القائمة الجانبية لسطح المكتب */}
       <aside
         className={`${
           collapsed ? 'w-[72px]' : 'w-[280px]'
@@ -311,10 +299,8 @@ export function Sidebar({ view, onNavigate }: SidebarProps) {
             الكاشير: <span className="text-slate-300 font-semibold">{settings.cashierName || 'غير محدد'}</span>
           </p>
           {collapsed && (
-            <div className="w-8 h-8 rounded-full bg-slate-800 mx-auto flex items-center justify-center">
-              <span className="text-xs font-bold text-slate-400">
-                {settings.cashierName?.charAt(0).toUpperCase() || '?'}
-              </span>
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-600 to-blue-800 mx-auto flex items-center justify-center text-white font-bold shadow-lg shadow-blue-600/30">
+              {settings.cashierName?.charAt(0).toUpperCase() || '?'}
             </div>
           )}
         </div>
