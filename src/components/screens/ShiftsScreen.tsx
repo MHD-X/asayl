@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useSettings } from '@/context/SettingsContext';
-import type { Shift, Order, CashEntry } from '@/types';
+import type { Shift, Order, CashEntry, Settings } from '@/types';
 import { PAYMENT_METHOD_LABELS } from '@/types';
 import { uid, formatMoney, formatDateTime, addAuditEntry } from '@/utils/storage';
 import { Button, Input, Field, Select, Modal } from '@/components/ui/Modal';
@@ -96,7 +96,7 @@ export function ShiftsScreen() {
     const actual = parseFloat(actualCash) || 0;
     const variance = actual - shiftStats.expectedCash;
     update((prev) => {
-      let s = {
+      const base: Settings = {
         ...prev,
         shifts: prev.shifts.map((sh) =>
           sh.id === endShift.id
@@ -105,10 +105,9 @@ export function ShiftsScreen() {
         ),
         currentShiftId: prev.currentShiftId === endShift.id ? undefined : prev.currentShiftId,
       };
-      s = addAuditEntry(s, endShift.cashierName, 'manager', 'إغلاق وردية', {
+      return addAuditEntry(base, endShift.cashierName, 'manager', 'إغلاق وردية', {
         orderId: endShift.id, amount: actual, reason: `الفرق: ${variance.toFixed(2)}`,
       });
-      return s;
     });
     setEndShift(null);
     setHandoverModalOpen(false);

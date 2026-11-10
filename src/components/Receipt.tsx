@@ -9,7 +9,6 @@ interface ReceiptProps {
   order: Order;
   onClose: () => void;
   onPrint?: () => void;
-  isPreview?: boolean;
 }
 
 const ORDER_TYPE_EN: Record<string, string> = {
@@ -19,24 +18,10 @@ const ORDER_TYPE_EN: Record<string, string> = {
   talabat: 'Talabat',
 };
 
-// ⚠️ NOTE: This on-screen preview and the actual printed ticket built in
-// PosScreen.printReceiptFor() are two separate templates. If you change the
-// receipt layout, branding, or fields shown here, mirror the change in
-// PosScreen.tsx's printReceiptFor() HTML string too, or the printed paper
-// receipt will silently drift out of sync with this preview.
-export function Receipt({ order, onClose, onPrint, isPreview = false }: ReceiptProps) {
+export function Receipt({ order, onClose, onPrint }: ReceiptProps) {
   const { settings } = useSettings();
   const r = settings.receiptSettings;
-  const branding = settings.branding;
   const itemCount = order.items.reduce((s, i) => s + i.qty, 0);
-
-  // ✅ حساب طول الورق تلقائياً حسب عدد الأصناف
-  const itemsCount = order.items.length;
-  const lineHeight = 24;
-  const headerHeight = 180;
-  const footerHeight = 120;
-  const totalHeight = headerHeight + (itemsCount * lineHeight) + footerHeight;
-  const paperHeight = Math.max(350, totalHeight);
 
   const handlePrint = () => {
     if (onPrint) {
@@ -46,11 +31,8 @@ export function Receipt({ order, onClose, onPrint, isPreview = false }: ReceiptP
     }
   };
 
-  const restaurantName = r.restaurantName || branding.name || 'مطعم أسايل';
-  const logo = branding.logo;
-
   return (
-    <Modal open onClose={onClose} title={isPreview ? 'معاينة الفاتورة (غير مدفوعة)' : 'معاينة الفاتورة'} size="md"
+    <Modal open onClose={onClose} title="معاينة الفاتورة قبل الطباعة" size="md"
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
@@ -59,7 +41,7 @@ export function Receipt({ order, onClose, onPrint, isPreview = false }: ReceiptP
           </Button>
           <Button onClick={handlePrint}>
             <Printer size={18} className="inline ml-2" />
-            {isPreview ? 'طباعة معاينة' : 'تأكيد وطباعة'}
+            تأكيد وطباعة
           </Button>
         </>
       }
@@ -68,27 +50,12 @@ export function Receipt({ order, onClose, onPrint, isPreview = false }: ReceiptP
         <div
           className="print-area thermal-receipt bg-white font-mono text-gray-900"
           dir="rtl"
-          style={{ 
-            width: '80mm', 
-            height: `${paperHeight}px`,
-            padding: '2mm 3mm' 
-          }}
+          style={{ width: '80mm', padding: '4mm 3mm' }}
         >
+          {/* Header */}
           <div className="text-center mb-2">
-            {logo && (
-              <img 
-                src={logo} 
-                alt="شعار المطعم" 
-                style={{ 
-                  maxWidth: '60mm', 
-                  height: 'auto', 
-                  margin: '0 auto 4px auto',
-                  display: 'block'
-                }} 
-              />
-            )}
-            {restaurantName && (
-              <p className="font-bold text-base leading-tight">{restaurantName}</p>
+            {r.restaurantName && (
+              <p className="font-bold text-base leading-tight">{r.restaurantName}</p>
             )}
             {r.subtitle && (
               <p className="text-xs text-gray-600 mt-0.5">{r.subtitle}</p>
@@ -104,11 +71,18 @@ export function Receipt({ order, onClose, onPrint, isPreview = false }: ReceiptP
             )}
           </div>
 
+          {/* Metadata */}
           <div className="border-t border-dashed border-gray-400 pt-1.5 mb-1.5 space-y-0.5 text-xs">
             {r.showCashierName && (
               <div className="flex justify-between">
                 <span>Name:</span>
                 <span className="font-semibold">{order.cashierName}</span>
+              </div>
+            )}
+            {r.showCashierName && (
+              <div className="flex justify-between">
+                <span>Phone:</span>
+                <span className="font-semibold">{r.phones || '-'}</span>
               </div>
             )}
             <div className="flex justify-between">
@@ -125,6 +99,7 @@ export function Receipt({ order, onClose, onPrint, isPreview = false }: ReceiptP
             )}
           </div>
 
+          {/* Customer details */}
           {order.customer && (order.customer.name || order.customer.phone || order.customer.address) && (
             <div className="border-t border-dashed border-gray-400 pt-1.5 mb-1.5 space-y-0.5 text-xs">
               {order.customer.name && (
@@ -148,13 +123,12 @@ export function Receipt({ order, onClose, onPrint, isPreview = false }: ReceiptP
             </div>
           )}
 
+          {/* Prominent Order ID box */}
           <div className="border-2 border-gray-800 rounded my-2 text-center py-1.5">
             <p className="font-bold text-lg tracking-wide">Order# {order.number}</p>
-            {isPreview && (
-              <p className="text-xs text-amber-600 font-bold">⚠️ معاينة - غير مدفوعة</p>
-            )}
           </div>
 
+          {/* Timestamps */}
           {r.showTimestamps && (
             <div className="space-y-0.5 text-xs mb-1.5">
               <div className="flex justify-between">
@@ -168,6 +142,7 @@ export function Receipt({ order, onClose, onPrint, isPreview = false }: ReceiptP
             </div>
           )}
 
+          {/* Items table */}
           <div className="border-t border-dashed border-gray-400 pt-1.5 mb-1.5">
             <div className="flex font-bold text-xs pb-1 border-b border-gray-300">
               <span className="flex-1">Item</span>
@@ -196,6 +171,7 @@ export function Receipt({ order, onClose, onPrint, isPreview = false }: ReceiptP
             ))}
           </div>
 
+          {/* Totals */}
           <div className="space-y-0.5 text-xs mb-1.5">
             <div className="flex justify-between">
               <span>المجموع الفرعي / Subtotal</span>
@@ -231,6 +207,7 @@ export function Receipt({ order, onClose, onPrint, isPreview = false }: ReceiptP
             </div>
           </div>
 
+          {/* Payment */}
           <div className="border-t border-dashed border-gray-400 pt-1.5 mb-1.5 text-xs">
             <div className="flex justify-between">
               <span>طريقة الدفع / Payment:</span>
@@ -238,6 +215,7 @@ export function Receipt({ order, onClose, onPrint, isPreview = false }: ReceiptP
             </div>
           </div>
 
+          {/* Footer */}
           <div className="text-center border-t border-dashed border-gray-400 pt-2 mt-1">
             <p className="text-xs text-gray-500">Items: {itemCount}</p>
             {r.footer && (
